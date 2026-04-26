@@ -5,13 +5,10 @@ import { getSession } from "@/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
-type Body = {
-  listing_id?: string;
-  direction?: "left" | "right";
-};
-
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type Body = { listing_id?: string };
 
 export async function POST(req: NextRequest) {
   const user = await getSession();
@@ -29,12 +26,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { listing_id, direction } = body;
-  if (!listing_id || !UUID_RE.test(listing_id)) {
+  const listingId = body.listing_id;
+  if (!listingId || !UUID_RE.test(listingId)) {
     return NextResponse.json({ error: "Bad listing_id" }, { status: 400 });
-  }
-  if (direction !== "left" && direction !== "right") {
-    return NextResponse.json({ error: "Bad direction" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
@@ -51,28 +45,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { error } = await supabase
-    .from("matches")
-    .upsert(
-      { renter_id: renter.id, listing_id, direction },
-      { onConflict: "renter_id,listing_id" }
+  const result = await notifyMatchInterest({
+    renterId: renter.id,
+    renterEmail: user.email,
+    listingId,
+  });
+
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error },
+      { status: 500 }
     );
-
-  if (error) {
-    console.error("[matches] upsert failed", error);
-    return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 
-  if (direction === "right") {
-    const notify = await notifyMatchInterest({
-      renterId: renter.id,
-      renterEmail: user.email,
-      listingId: listing_id,
-    });
-    if (!notify.ok) {
-      console.error("[matches] notifyMatchInterest", notify.error);
-    }
-  }
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    skipped: result.skipped ?? null,
+  });
 }

@@ -16,6 +16,13 @@ const AMENITIES = [
   { value: "ac", label: "Air conditioning" },
 ];
 
+const NEIGHBORHOODS = [
+  "Southside",
+  "Northside",
+  "Downtown Berkeley",
+  "Oakland Border",
+];
+
 const MAX_PHOTO_MB = 50;
 const MAX_PHOTO_COUNT = 8;
 
@@ -139,6 +146,24 @@ export function LandlordForm({ defaultEmail }: { defaultEmail: string }) {
           className={inputBase}
         />
       </Field>
+
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <Field label="Neighborhood" htmlFor="neighborhood">
+          <select
+            id="neighborhood"
+            name="neighborhood"
+            required
+            className={inputBase}
+          >
+            <option value="">Choose one</option>
+            {NEIGHBORHOODS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <Field label="Rent" htmlFor="rent" hint="USD / month">

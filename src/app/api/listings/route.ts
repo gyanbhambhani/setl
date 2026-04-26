@@ -10,6 +10,12 @@ export const runtime = "nodejs";
 
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const MAX_PHOTO_COUNT = 8;
+const NEIGHBORHOODS = new Set([
+  "Southside",
+  "Northside",
+  "Downtown Berkeley",
+  "Oakland Border",
+]);
 
 function getString(form: FormData, key: string): string {
   const v = form.get(key);
@@ -52,6 +58,7 @@ export async function POST(req: NextRequest) {
   const landlord_email = getString(form, "landlord_email") || user.email;
   const landlord_phone = getString(form, "landlord_phone");
   const address = getString(form, "address");
+  const neighborhood = getString(form, "neighborhood");
   const rent = getNumber(form, "rent");
   const available_date = getString(form, "available_date");
   const bedrooms = getNumber(form, "bedrooms");
@@ -65,6 +72,12 @@ export async function POST(req: NextRequest) {
   if (!address || !rent || !available_date) {
     return NextResponse.json(
       { error: "Address, rent, and availability date are required." },
+      { status: 400 }
+    );
+  }
+  if (!NEIGHBORHOODS.has(neighborhood)) {
+    return NextResponse.json(
+      { error: "Choose a valid neighborhood." },
       { status: 400 }
     );
   }
@@ -151,6 +164,7 @@ export async function POST(req: NextRequest) {
       landlord_email,
       landlord_phone: landlord_phone || null,
       address,
+      neighborhood,
       rent,
       available_date,
       bedrooms,

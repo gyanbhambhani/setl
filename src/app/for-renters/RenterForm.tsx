@@ -17,10 +17,10 @@ export type RenterDefaults = {
 };
 
 const NEIGHBORHOODS = [
-  { value: "southside", label: "Southside" },
-  { value: "northside", label: "Northside" },
-  { value: "downtown", label: "Downtown Berkeley" },
-  { value: "oakland_border", label: "Oakland border" },
+  { value: "Southside", label: "Southside" },
+  { value: "Northside", label: "Northside" },
+  { value: "Downtown Berkeley", label: "Downtown Berkeley" },
+  { value: "Oakland Border", label: "Oakland Border" },
 ];
 
 const DEALBREAKERS = [

@@ -14,7 +14,7 @@ export type Listing = {
   photo_urls?: string[] | null;
   amenities: string[] | null;
   available_date: string | null;
-  neighborhood?: string;
+  neighborhood?: string | null;
 };
 
 const SWIPE_THRESHOLD = 110;

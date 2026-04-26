@@ -32,6 +32,7 @@ create table if not exists public.listings (
   landlord_email  text,
   landlord_phone  text,
   address         text,
+  neighborhood    text,
   rent            int,
   available_date  date,
   bedrooms        int,
@@ -39,6 +40,7 @@ create table if not exists public.listings (
   amenities       text[],
   video_url       text,
   photo_urls      text[],
+  response_rate   double precision default null,
   status          text not null default 'pending',
   created_at      timestamptz not null default now()
 );
@@ -97,6 +99,18 @@ create index if not exists matches_listing_id_idx
 -- Prevent duplicate swipes for the same renter / listing pair.
 create unique index if not exists matches_renter_listing_unique
   on public.matches (renter_id, listing_id);
+
+alter table public.matches
+  add column if not exists landlord_notified_at timestamptz;
+alter table public.matches
+  add column if not exists landlord_responded_at timestamptz;
+alter table public.matches
+  add column if not exists nudge_sent_at timestamptz;
+
+alter table public.listings
+  add column if not exists response_rate double precision default null;
+alter table public.listings
+  add column if not exists neighborhood text;
 
 -- Row Level Security ----------------------------------------------------
 -- v1 writes/reads happen through API route handlers using the service

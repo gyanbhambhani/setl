@@ -16,6 +16,7 @@ type SendArgs = {
   to: string;
   subject: string;
   html: string;
+  replyTo?: string;
 };
 
 export async function sendEmail(args: SendArgs): Promise<void> {
@@ -30,6 +31,7 @@ export async function sendEmail(args: SendArgs): Promise<void> {
       to: args.to,
       subject: args.subject,
       html: args.html,
+      replyTo: args.replyTo,
     });
   } catch (err) {
     console.error("[email] send failed", err);
@@ -69,6 +71,88 @@ export function renterConfirmationEmail() {
       </p>
     `),
   };
+}
+
+export function landlordMatchInterestEmail(args: {
+  address: string;
+  budgetLabel: string;
+  moveDate: string;
+  neighborhoods: string;
+  loginUrl: string;
+}) {
+  const { address, budgetLabel, moveDate, neighborhoods, loginUrl } = args;
+  return {
+    subject: "Someone saved your listing — Setl",
+    html: wrapper(`
+      <h1 style="font-size:22px;line-height:1.25;margin:0 0 12px;">
+        Someone is interested in your unit
+      </h1>
+      <p style="font-size:15px;line-height:1.6;color:#1a1a1a;margin:0 0 12px;">
+        A verified renter saved <strong>${escapeHtml(address)}</strong> on Setl.
+        Here&rsquo;s what they shared:
+      </p>
+      <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
+        <li><strong>Budget:</strong> ${escapeHtml(budgetLabel)}</li>
+        <li><strong>Move date:</strong> ${escapeHtml(moveDate)}</li>
+        <li><strong>Neighborhoods:</strong> ${escapeHtml(neighborhoods)}</li>
+      </ul>
+      <p style="font-size:15px;line-height:1.6;color:#1a1a1a;margin:0 0 16px;">
+        Reply to this email to connect, or
+        <a href="${loginUrl}" style="color:#5c7a5c;">log in to your dashboard</a>
+        to see more context.
+      </p>
+    `),
+  };
+}
+
+export function renterMatchQueuedEmail() {
+  return {
+    subject: "We pinged the landlord — Setl",
+    html: wrapper(`
+      <h1 style="font-size:22px;line-height:1.25;margin:0 0 12px;">
+        We&rsquo;ve notified the landlord
+      </h1>
+      <p style="font-size:15px;line-height:1.6;color:#1a1a1a;margin:0;">
+        If they don&rsquo;t respond within 24 hours, we&rsquo;ll follow up for you.
+      </p>
+    `),
+  };
+}
+
+export function landlordMatchNudgeEmail(args: {
+  address: string;
+  renterCount: number;
+  loginUrl: string;
+}) {
+  const { address, renterCount, loginUrl } = args;
+  const noun =
+    renterCount === 1 ? "a renter is" : `${renterCount} renters are`;
+  return {
+    subject: "Reminder: renters are waiting — Setl",
+    html: wrapper(`
+      <h1 style="font-size:22px;line-height:1.25;margin:0 0 12px;">
+        24-hour check-in
+      </h1>
+      <p style="font-size:15px;line-height:1.6;color:#1a1a1a;margin:0 0 12px;">
+        ${noun} still waiting on <strong>${escapeHtml(address)}</strong>.
+        Please log in to respond &mdash; responsive landlords stay prioritized
+        on Setl.
+      </p>
+      <p style="margin:0;">
+        <a href="${loginUrl}" style="display:inline-block;background:#5c7a5c;
+        color:#fafaf8;text-decoration:none;padding:12px 20px;border-radius:999px;
+        font-size:14px;font-weight:600;">Open dashboard</a>
+      </p>
+    `),
+  };
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export function landlordConfirmationEmail() {
