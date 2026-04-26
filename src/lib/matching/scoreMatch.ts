@@ -114,7 +114,9 @@ function scoreTiming(renter: RenterProfile, listing: Listing): number {
   if (!renter.move_date || !listing.available_date) return 10;
   const diff = daysBetween(renter.move_date, listing.available_date);
   if (diff == null) return 10;
-  if (diff < -30 || diff > 60) return 0;
+  if (diff > 60) return 0;
+  if (diff < -60) return 0;
+  if (diff < 0) return 12;
 
   const abs = Math.abs(diff);
   if (abs <= 7) return 25;
