@@ -1,9 +1,30 @@
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { isAdmin } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { AdminListings, type AdminListing } from "./AdminListings";
+import {
+  ApprovedListings,
+  type ApprovedListing,
+} from "./ApprovedListings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin — Setl" };
@@ -23,16 +44,26 @@ type RenterRow = {
 
 async function loadAdminData() {
   const supabase = getSupabaseAdmin();
-  const [pending, renters] = await Promise.all([
+  const [pending, approvedRes, matchesRes, renters] = await Promise.all([
     supabase
       .from("listings")
       .select(
-        "id, address, rent, bedrooms, bathrooms, video_url, photo_urls, amenities," +
-          " available_date, landlord_email, landlord_phone, status," +
-          " created_at"
+        "id, address, rent, bedrooms, bathrooms, video_url, photo_urls, " +
+          "amenities, available_date, landlord_email, landlord_phone, " +
+          "status, created_at"
       )
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("listings")
+      .select(
+        "id, address, neighborhood, rent, bedrooms, bathrooms, video_url, " +
+          "photo_urls, amenities, available_date, landlord_email, " +
+          "landlord_phone, status, created_at"
+      )
+      .eq("status", "approved")
+      .order("created_at", { ascending: false }),
+    supabase.from("matches").select("listing_id, direction"),
     supabase
       .from("renters")
       .select(
@@ -42,8 +73,28 @@ async function loadAdminData() {
       .order("created_at", { ascending: false })
       .limit(200),
   ]);
+
+  const counts = new Map<string, { rights: number; lefts: number }>();
+  for (const row of (matchesRes.data ?? []) as Array<{
+    listing_id: string;
+    direction: string;
+  }>) {
+    const cur = counts.get(row.listing_id) ?? { rights: 0, lefts: 0 };
+    if (row.direction === "right") cur.rights += 1;
+    else if (row.direction === "left") cur.lefts += 1;
+    counts.set(row.listing_id, cur);
+  }
+  const approved = ((approvedRes.data ?? []) as unknown as Omit<
+    ApprovedListing,
+    "rights" | "lefts"
+  >[]).map((l) => {
+    const c = counts.get(l.id) ?? { rights: 0, lefts: 0 };
+    return { ...l, rights: c.rights, lefts: c.lefts };
+  });
+
   return {
     pending: (pending.data ?? []) as unknown as AdminListing[],
+    approved,
     renters: (renters.data ?? []) as unknown as RenterRow[],
   };
 }
@@ -59,87 +110,134 @@ export default async function AdminPage({
     return (
       <>
         <Header />
-        <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-24">
-          <h1 className="text-[28px] font-semibold tracking-tight">
+        <main
+          className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-16
+            sm:py-24"
+        >
+          <p
+            className="font-mono text-[11px] uppercase tracking-[0.22em]
+              text-muted-foreground"
+          >
+            Internal
+          </p>
+          <h1
+            className="mt-3 font-display text-[34px] leading-[1.05]
+              tracking-tight"
+            style={{ fontVariationSettings: "'opsz' 144" }}
+          >
             Admin
           </h1>
-          <p className="mt-2 text-[14px] text-muted">
+          <p className="mt-2 text-[14px] text-muted-foreground">
             Enter the password to review listings.
           </p>
-          <form
-            action="/api/admin/login"
-            method="post"
-            className="mt-8 flex flex-col gap-3"
-          >
-            <input
-              type="password"
-              name="password"
-              required
-              autoFocus
-              placeholder="Password"
-              className="w-full rounded-xl border border-hairline bg-surface
-                px-4 py-3 text-[15px] focus:border-accent focus:outline-none
-                focus:ring-2 focus:ring-accent/20"
-            />
-            <button
-              type="submit"
-              className="h-11 rounded-full bg-accent text-sm font-medium text-[#fafaf8]
-                hover:bg-accent-hover"
-            >
-              Sign in
-            </button>
-            {sp?.error ? (
-              <p className="text-sm text-red-700">Wrong password.</p>
-            ) : null}
-          </form>
+          <Card className="mt-8">
+            <CardContent>
+              <form action="/api/admin/login" method="post">
+                <FieldGroup>
+                  <Field data-invalid={sp?.error ? true : undefined}>
+                    <FieldLabel htmlFor="admin-password">Password</FieldLabel>
+                    <Input
+                      id="admin-password"
+                      type="password"
+                      name="password"
+                      required
+                      autoFocus
+                      placeholder="••••••••"
+                      aria-invalid={sp?.error ? true : undefined}
+                    />
+                    <FieldError>
+                      {sp?.error ? "Wrong password." : undefined}
+                    </FieldError>
+                  </Field>
+                  <Button type="submit" size="lg">
+                    Sign in
+                  </Button>
+                </FieldGroup>
+              </form>
+            </CardContent>
+          </Card>
         </main>
         <Footer />
       </>
     );
   }
 
-  const { pending, renters } = await loadAdminData();
+  const { pending, approved, renters } = await loadAdminData();
+  const totalRights = approved.reduce((sum, l) => sum + l.rights, 0);
 
   return (
     <>
       <Header />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
-        <div className="mb-10 flex items-center justify-between">
+      <main
+        className="mx-auto w-full max-w-6xl flex-1 px-6 py-12 sm:py-16"
+      >
+        <div
+          className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end
+            sm:justify-between"
+        >
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-              Admin
+            <p
+              className="font-mono text-[11px] uppercase tracking-[0.22em]
+                text-muted-foreground"
+            >
+              Internal
             </p>
-            <h1 className="mt-2 text-[28px] font-semibold tracking-tight">
+            <h1
+              className="mt-3 font-display text-[36px] leading-[1.05]
+                tracking-tight sm:text-[44px]"
+              style={{ fontVariationSettings: "'opsz' 144, 'SOFT' 60" }}
+            >
               Review queue
             </h1>
           </div>
           <form action="/api/admin/logout" method="post">
-            <button
-              type="submit"
-              className="text-sm text-muted underline-offset-4 hover:underline"
-            >
+            <Button type="submit" variant="ghost" size="sm">
               Sign out
-            </button>
+            </Button>
           </form>
         </div>
 
-        <section className="mb-16">
-          <h2 className="mb-4 text-[18px] font-semibold tracking-tight">
+        <section className="mb-14">
+          <h2
+            className="mb-5 font-display text-[20px] leading-tight
+              tracking-tight"
+          >
             Pending listings ({pending.length})
           </h2>
           <AdminListings listings={pending} />
         </section>
 
+        <section className="mb-14">
+          <div
+            className="mb-5 flex flex-wrap items-baseline justify-between
+              gap-3"
+          >
+            <h2
+              className="font-display text-[20px] leading-tight tracking-tight"
+            >
+              Approved listings ({approved.length})
+            </h2>
+            <p className="text-[12px] text-muted-foreground">
+              {totalRights} renter{" "}
+              {totalRights === 1 ? "right-swipe" : "right-swipes"} so far
+            </p>
+          </div>
+          <ApprovedListings listings={approved} />
+        </section>
+
         <section>
-          <h2 className="mb-4 text-[18px] font-semibold tracking-tight">
+          <h2
+            className="mb-5 font-display text-[20px] leading-tight
+              tracking-tight"
+          >
             Renter signups ({renters.length})
           </h2>
           <RenterTable rows={renters} />
         </section>
 
-        <p className="mt-12 text-[12px] text-muted">
-          Need to flip an approved or rejected listing back to pending?
-          Edit it in the{" "}
+        <p className="mt-12 text-[12px] text-muted-foreground">
+          Need to flip an approved or rejected listing back to pending? Edit
+          it in the{" "}
           <Link
             href="https://supabase.com/dashboard"
             className="underline underline-offset-4"
@@ -157,55 +255,66 @@ export default async function AdminPage({
 function RenterTable({ rows }: { rows: RenterRow[] }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-hairline bg-surface p-6 text-sm text-muted">
-        No renter signups yet.
-      </div>
+      <Card>
+        <CardContent className="py-6 text-sm text-muted-foreground">
+          No renter signups yet.
+        </CardContent>
+      </Card>
     );
   }
   return (
-    <div className="overflow-x-auto rounded-2xl border border-hairline bg-surface">
-      <table className="min-w-full divide-y divide-hairline text-sm">
-        <thead className="bg-background/60 text-left text-[11px] uppercase tracking-widest text-muted">
-          <tr>
-            <th className="px-4 py-3">Email</th>
-            <th className="px-4 py-3">Budget</th>
-            <th className="px-4 py-3">Move</th>
-            <th className="px-4 py-3">Roommates</th>
-            <th className="px-4 py-3">Neighborhoods</th>
-            <th className="px-4 py-3">Dealbreakers</th>
-            <th className="px-4 py-3">Ideal</th>
-            <th className="px-4 py-3">Joined</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-hairline">
-          {rows.map((r) => (
-            <tr key={r.id} className="align-top">
-              <td className="px-4 py-3 font-medium">{r.email ?? "—"}</td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                {r.budget_min != null && r.budget_max != null
-                  ? `$${r.budget_min}–$${r.budget_max}`
-                  : "—"}
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                {r.move_date ?? "—"}
-              </td>
-              <td className="px-4 py-3">{r.roommates ?? "—"}</td>
-              <td className="px-4 py-3 max-w-[220px] text-muted">
-                {(r.neighborhoods ?? []).join(", ") || "—"}
-              </td>
-              <td className="px-4 py-3 max-w-[220px] text-muted">
-                {(r.dealbreakers ?? []).join(", ") || "—"}
-              </td>
-              <td className="px-4 py-3 max-w-[280px] text-muted">
-                {r.description ?? "—"}
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap text-muted">
-                {new Date(r.created_at).toLocaleDateString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card className="p-0">
+      <CardContent className="px-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-5">Email</TableHead>
+                <TableHead>Budget</TableHead>
+                <TableHead>Move</TableHead>
+                <TableHead>Roommates</TableHead>
+                <TableHead>Neighborhoods</TableHead>
+                <TableHead>Dealbreakers</TableHead>
+                <TableHead>Ideal</TableHead>
+                <TableHead className="pr-5">Joined</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id} className="align-top">
+                  <TableCell className="pl-5 font-medium">
+                    {r.email ?? "—"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.budget_min != null && r.budget_max != null
+                      ? `$${r.budget_min}–$${r.budget_max}`
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.move_date ?? "—"}
+                  </TableCell>
+                  <TableCell>{r.roommates ?? "—"}</TableCell>
+                  <TableCell className="max-w-[200px] text-muted-foreground">
+                    {(r.neighborhoods ?? []).join(", ") || "—"}
+                  </TableCell>
+                  <TableCell className="max-w-[200px] text-muted-foreground">
+                    {(r.dealbreakers ?? []).join(", ") || "—"}
+                  </TableCell>
+                  <TableCell className="max-w-[260px] text-muted-foreground">
+                    {r.description ?? "—"}
+                  </TableCell>
+                  <TableCell
+                    className="whitespace-nowrap pr-5
+                      text-muted-foreground"
+                  >
+                    {new Date(r.created_at).toLocaleDateString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

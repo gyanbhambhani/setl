@@ -2,6 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Inbox } from "lucide-react";
 
 export type AdminListing = {
   id: string;
@@ -22,16 +33,17 @@ export type AdminListing = {
 export function AdminListings({ listings }: { listings: AdminListing[] }) {
   if (listings.length === 0) {
     return (
-      <div
-        className="rounded-2xl border border-hairline bg-surface p-6 text-sm
-          text-muted"
-      >
-        No pending listings. Inbox zero.
-      </div>
+      <Empty className="border border-dashed border-border bg-card">
+        <EmptyMedia variant="icon">
+          <Inbox strokeWidth={1.5} />
+        </EmptyMedia>
+        <EmptyTitle>Inbox zero</EmptyTitle>
+        <EmptyContent>No pending listings to review.</EmptyContent>
+      </Empty>
     );
   }
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
       {listings.map((l) => (
         <PendingCard key={l.id} listing={l} />
       ))}
@@ -63,8 +75,8 @@ function PendingCard({ listing }: { listing: AdminListing }) {
 
   const cover = listing.photo_urls?.[0] ?? listing.video_url ?? null;
   return (
-    <div className="overflow-hidden rounded-2xl border border-hairline bg-surface">
-      <div className="bg-black aspect-video w-full">
+    <Card className="overflow-hidden p-0">
+      <div className="aspect-video w-full bg-black">
         {cover ? (
           <img
             src={cover}
@@ -72,71 +84,82 @@ function PendingCard({ listing }: { listing: AdminListing }) {
             alt="Listing photo"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-[#fafaf8]/60">
+          <div
+            className="flex h-full items-center justify-center text-sm
+              text-[#fafaf8]/60"
+          >
             No photo
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-3 p-5">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-[16px] font-semibold tracking-tight">
+      <CardContent className="flex flex-col gap-3 px-5 py-5">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3
+            className="font-display text-[18px] leading-tight tracking-tight"
+            style={{ fontVariationSettings: "'opsz' 144" }}
+          >
             {listing.address ?? "(no address)"}
           </h3>
           <span className="text-[15px] font-medium">
             {listing.rent != null ? `$${listing.rent.toLocaleString()}` : "—"}
           </span>
         </div>
-        <p className="text-[13px] text-muted">
+        <p className="text-[13px] text-muted-foreground">
           {listing.bedrooms ?? "?"}BR · {listing.bathrooms ?? "?"} bath ·
-          {" "}
           available{" "}
           {listing.available_date
             ? new Date(listing.available_date).toLocaleDateString()
             : "soon"}
         </p>
-        <p className="text-[12px] text-muted">
+        <p className="text-[12px] text-muted-foreground">
           {listing.landlord_email ?? ""}
           {listing.landlord_phone ? ` · ${listing.landlord_phone}` : ""}
         </p>
         {(listing.amenities ?? []).length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {(listing.amenities ?? []).map((a) => (
-              <span
-                key={a}
-                className="rounded-full border border-hairline px-2.5 py-0.5 text-[11px] text-foreground/70"
-              >
+              <Badge key={a} variant="outline" className="font-normal">
                 {a.replace(/_/g, " ")}
-              </span>
+              </Badge>
             ))}
           </div>
         ) : null}
 
         {done ? (
-          <p className="text-sm text-accent-hover">
-            Marked as {done}. Refresh to drop from queue.
+          <p
+            className="mt-1 inline-flex items-center gap-1.5 text-sm
+              text-brand-ink"
+          >
+            <CheckCircle2 className="size-4" />
+            Marked as {done}.
           </p>
         ) : (
           <div className="mt-2 flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => update("approved")}
               disabled={pending}
-              className="h-9 flex-1 rounded-full bg-accent text-sm font-medium text-[#fafaf8] hover:bg-accent-hover disabled:opacity-50"
+              className="flex-1"
             >
               Approve
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => update("rejected")}
               disabled={pending}
-              className="h-9 flex-1 rounded-full border border-hairline text-sm font-medium text-foreground hover:border-foreground/40 disabled:opacity-50"
+              className="flex-1"
             >
               Reject
-            </button>
+            </Button>
           </div>
         )}
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-      </div>
-    </div>
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

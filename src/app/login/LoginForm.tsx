@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/Button";
-import { Field, inputBase } from "@/components/Field";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
@@ -32,40 +39,45 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     }
   }
 
+  const invalid = error !== null;
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <Field label="Email" htmlFor="email">
-        <input
-          id="email"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@berkeley.edu"
-          className={inputBase}
-          autoComplete="email"
-          autoFocus
-        />
-      </Field>
-      <Field label="Password" htmlFor="password">
-        <input
-          id="password"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className={inputBase}
-          autoComplete="current-password"
-        />
-      </Field>
-      {error ? (
-        <p className="text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <Button size="lg" type="submit" disabled={submitting}>
-        {submitting ? "Signing in…" : "Sign in"}
-      </Button>
+    <form onSubmit={handleSubmit}>
+      <FieldGroup>
+        <Field data-invalid={invalid || undefined}>
+          <FieldLabel htmlFor="email">Email</FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@berkeley.edu"
+            autoComplete="email"
+            autoFocus
+            aria-invalid={invalid || undefined}
+          />
+        </Field>
+        <Field data-invalid={invalid || undefined}>
+          <FieldLabel htmlFor="password">Password</FieldLabel>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            aria-invalid={invalid || undefined}
+          />
+          <FieldDescription>
+            Use the password you chose when signing up.
+          </FieldDescription>
+          <FieldError>{error ?? undefined}</FieldError>
+        </Field>
+        <Button type="submit" size="lg" disabled={submitting}>
+          {submitting ? "Signing in…" : "Sign in"}
+        </Button>
+      </FieldGroup>
     </form>
   );
 }

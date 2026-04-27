@@ -2,9 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Button } from "@/components/Button";
-import { ChipMultiSelect } from "@/components/ChipMultiSelect";
-import { Field, inputBase } from "@/components/Field";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Chips } from "@/components/Chips";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 
 export type RenterDefaults = {
   budget_min: number | null;
@@ -32,6 +47,14 @@ const DEALBREAKERS = [
   { value: "no_natural_light", label: "No natural light" },
 ];
 
+const ROOMMATE_OPTIONS = [
+  { value: "0", label: "Just me" },
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "4", label: "4+" },
+];
+
 const MIN_BUDGET = 600;
 const MAX_BUDGET = 5000;
 
@@ -44,7 +67,9 @@ export function RenterForm({
   const [budgetMin, setBudgetMin] = useState(defaults?.budget_min ?? 1500);
   const [budgetMax, setBudgetMax] = useState(defaults?.budget_max ?? 2800);
   const [moveDate, setMoveDate] = useState(defaults?.move_date ?? "");
-  const [roommates, setRoommates] = useState(defaults?.roommates ?? 1);
+  const [roommates, setRoommates] = useState(
+    String(defaults?.roommates ?? 1)
+  );
   const [neighborhoods, setNeighborhoods] = useState<string[]>(
     defaults?.neighborhoods ?? []
   );
@@ -61,12 +86,6 @@ export function RenterForm({
     [budgetMin, budgetMax]
   );
 
-  function toggle(arr: string[], value: string): string[] {
-    return arr.includes(value)
-      ? arr.filter((v) => v !== value)
-      : [...arr, value];
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -79,7 +98,7 @@ export function RenterForm({
           budget_min: budgetMin,
           budget_max: budgetMax,
           move_date: moveDate || null,
-          roommates,
+          roommates: Number(roommates),
           neighborhoods,
           dealbreakers,
           description,
@@ -100,126 +119,162 @@ export function RenterForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-10">
-      <Field label="Budget" hint={formattedRange}>
-        <div
-          className="rounded-2xl border border-hairline bg-surface p-5"
-        >
-          <div className="flex flex-col gap-4">
-            <div>
-              <div className="mb-1 flex justify-between text-[12px] text-muted">
-                <span>Minimum</span>
-                <span>${budgetMin.toLocaleString()}</span>
-              </div>
-              <input
-                type="range"
+    <form onSubmit={handleSubmit}>
+      <FieldGroup>
+        <FieldSet>
+          <FieldLegend>Budget</FieldLegend>
+          <FieldDescription>{formattedRange}</FieldDescription>
+          <Card className="mt-2">
+            <CardContent className="space-y-5 py-4">
+              <RangeRow
+                label="Minimum"
+                value={budgetMin}
                 min={MIN_BUDGET}
                 max={MAX_BUDGET}
-                step={50}
-                value={budgetMin}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
+                onChange={(v) => {
                   setBudgetMin(v);
                   if (v > budgetMax) setBudgetMax(v);
                 }}
-                className="w-full accent-[#5c7a5c]"
               />
-            </div>
-            <div>
-              <div className="mb-1 flex justify-between text-[12px] text-muted">
-                <span>Maximum</span>
-                <span>${budgetMax.toLocaleString()}</span>
-              </div>
-              <input
-                type="range"
+              <RangeRow
+                label="Maximum"
+                value={budgetMax}
                 min={MIN_BUDGET}
                 max={MAX_BUDGET}
-                step={50}
-                value={budgetMax}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
+                onChange={(v) => {
                   setBudgetMax(v);
                   if (v < budgetMin) setBudgetMin(v);
                 }}
-                className="w-full accent-[#5c7a5c]"
               />
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+        </FieldSet>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="move_date">Move-in date</FieldLabel>
+            <Input
+              id="move_date"
+              type="date"
+              value={moveDate}
+              onChange={(e) => setMoveDate(e.target.value)}
+            />
+          </Field>
+          <FieldSet>
+            <FieldLegend variant="label">Roommates</FieldLegend>
+            <ToggleGroup
+              value={[roommates]}
+              onValueChange={(v) => {
+                const next = (v as string[])[0];
+                if (next) setRoommates(next);
+              }}
+              variant="outline"
+              size="sm"
+              spacing={2}
+              className="flex-wrap"
+              aria-label="Number of roommates"
+            >
+              {ROOMMATE_OPTIONS.map((opt) => (
+                <ToggleGroupItem
+                  key={opt.value}
+                  value={opt.value}
+                  className="rounded-full px-4"
+                >
+                  {opt.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </FieldSet>
         </div>
-      </Field>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <Field label="Move-in date" htmlFor="move_date">
-          <input
-            id="move_date"
-            type="date"
-            value={moveDate}
-            onChange={(e) => setMoveDate(e.target.value)}
-            className={inputBase}
+        <FieldSet>
+          <FieldLegend variant="label">Neighborhoods</FieldLegend>
+          <FieldDescription>Pick any that work for you.</FieldDescription>
+          <Chips
+            options={NEIGHBORHOODS}
+            selected={neighborhoods}
+            onChange={setNeighborhoods}
+            ariaLabel="Neighborhoods"
           />
+        </FieldSet>
+
+        <FieldSet>
+          <FieldLegend variant="label">Dealbreakers</FieldLegend>
+          <FieldDescription>
+            We&rsquo;ll filter listings that match these.
+          </FieldDescription>
+          <Chips
+            options={DEALBREAKERS}
+            selected={dealbreakers}
+            onChange={setDealbreakers}
+            ariaLabel="Dealbreakers"
+          />
+        </FieldSet>
+
+        <Field data-invalid={error ? true : undefined}>
+          <FieldLabel htmlFor="description">Describe your ideal place</FieldLabel>
+          <Textarea
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Sunny, walkable to campus, room for a desk."
+          />
+          <FieldDescription>One sentence is plenty.</FieldDescription>
+          <FieldError>{error ?? undefined}</FieldError>
         </Field>
-        <Field label="Number of roommates" htmlFor="roommates">
-          <select
-            id="roommates"
-            value={roommates}
-            onChange={(e) => setRoommates(Number(e.target.value))}
-            className={inputBase}
-          >
-            {[0, 1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
-                {n === 0 ? "Just me" : `${n} roommate${n > 1 ? "s" : ""}`}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
 
-      <Field label="Neighborhoods">
-        <ChipMultiSelect
-          options={NEIGHBORHOODS}
-          selected={neighborhoods}
-          onToggle={(v) => setNeighborhoods((a) => toggle(a, v))}
-        />
-      </Field>
-
-      <Field label="Dealbreakers">
-        <ChipMultiSelect
-          options={DEALBREAKERS}
-          selected={dealbreakers}
-          onToggle={(v) => setDealbreakers((a) => toggle(a, v))}
-        />
-      </Field>
-
-      <Field
-        label="Describe your ideal place"
-        htmlFor="description"
-        hint="One sentence is plenty"
-      >
-        <textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          placeholder="Sunny, walkable to campus, room for a desk."
-          className={`${inputBase} resize-none`}
-        />
-      </Field>
-
-      {error ? (
-        <p className="text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-[13px] text-muted">
-          By submitting, you&rsquo;ll see verified listings and get matched
-          manually.
-        </p>
-        <Button size="lg" type="submit" disabled={submitting}>
-          {submitting ? "Sending…" : "Show me places"}
-        </Button>
-      </div>
+        <div
+          className="flex flex-col-reverse items-start gap-4 sm:flex-row
+            sm:items-center sm:justify-between"
+        >
+          <p className="text-[13px] text-muted-foreground">
+            By submitting, you&rsquo;ll see verified listings and get matched
+            manually.
+          </p>
+          <Button type="submit" size="lg" disabled={submitting}>
+            {submitting ? "Sending…" : "Show me places"}
+          </Button>
+        </div>
+      </FieldGroup>
     </form>
+  );
+}
+
+function RangeRow({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <div
+        className="mb-1.5 flex justify-between text-[12px]
+          text-muted-foreground"
+      >
+        <span>{label}</span>
+        <span className="font-mono text-foreground">
+          ${value.toLocaleString()}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={50}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-brand"
+        aria-label={label}
+      />
+    </div>
   );
 }

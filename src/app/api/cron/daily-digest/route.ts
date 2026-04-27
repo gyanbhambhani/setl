@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { chaseUnresponsiveLandlords } from "@/lib/chaseLandlords";
+import { runDailyDigests } from "@/lib/dailyDigest";
 
 export const runtime = "nodejs";
 
@@ -9,9 +9,7 @@ function verifyCron(req: NextRequest): boolean {
     return process.env.NODE_ENV !== "production";
   }
   const auth = req.headers.get("authorization");
-  if (auth === `Bearer ${secret}`) {
-    return true;
-  }
+  if (auth === `Bearer ${secret}`) return true;
   const q = req.nextUrl.searchParams.get("secret");
   return q === secret;
 }
@@ -20,7 +18,6 @@ export async function GET(req: NextRequest) {
   if (!verifyCron(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const result = await chaseUnresponsiveLandlords();
+  const result = await runDailyDigests();
   return NextResponse.json(result);
 }

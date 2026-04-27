@@ -40,10 +40,15 @@ export type LandlordMatchRow = {
 export type LandlordListingActivity = {
   id: string;
   address: string | null;
+  neighborhood: string | null;
   rent: number | null;
   status: string;
   bedrooms: number | null;
   bathrooms: number | null;
+  available_date: string | null;
+  amenities: string[] | null;
+  landlord_email: string | null;
+  landlord_phone: string | null;
   created_at: string;
   photo_urls: string[] | null;
   video_url: string | null;
@@ -99,8 +104,9 @@ export async function loadLandlordActivity(
   const { data, error } = await supabase
     .from("listings")
     .select(
-      "id, address, rent, status, bedrooms, bathrooms, created_at, " +
-        "photo_urls, video_url, " +
+      "id, address, neighborhood, rent, status, bedrooms, bathrooms, " +
+        "available_date, amenities, landlord_email, landlord_phone, " +
+        "created_at, photo_urls, video_url, " +
         "matches ( direction, created_at, renters ( budget_min, budget_max, " +
         "move_date, neighborhoods ) )"
     )

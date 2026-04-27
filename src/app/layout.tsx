@@ -1,17 +1,32 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
+import { cn } from "@/lib/utils";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const geist = Geist({
+  variable: "--font-sans",
   subsets: ["latin"],
   display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const fraunces = Fraunces({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
+  axes: ["opsz", "SOFT"],
 });
 
 export const metadata: Metadata = {
   title: "Setl — Verified student housing in Berkeley",
   description:
-    "Setl is verified student housing for Berkeley. Real videos, real landlords, 24-hour response guarantee.",
+    "Setl is verified student housing for Berkeley. Real photos, real " +
+    "landlords, 24-hour response guarantee.",
 };
 
 export default function RootLayout({
@@ -22,7 +37,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased`}
+      className={cn(
+        "h-full antialiased",
+        geist.variable,
+        geistMono.variable,
+        fraunces.variable,
+        "font-sans"
+      )}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}

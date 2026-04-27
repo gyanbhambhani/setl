@@ -1,13 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/Button";
-import { Field, inputBase } from "@/components/Field";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 
 const MIN_PASSWORD = 8;
 
-export function SignupForm({ redirectTo }: { redirectTo: string }) {
+export function SignupForm({
+  redirectTo,
+  role,
+}: {
+  redirectTo: string;
+  role: "renter" | "landlord" | null;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -30,7 +43,7 @@ export function SignupForm({ redirectTo }: { redirectTo: string }) {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -54,51 +67,57 @@ export function SignupForm({ redirectTo }: { redirectTo: string }) {
     }
   }
 
+  const invalid = error !== null;
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <Field label="Email" htmlFor="signup-email">
-        <input
-          id="signup-email"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@berkeley.edu"
-          className={inputBase}
-          autoComplete="email"
-          autoFocus
-        />
-      </Field>
-      <Field label="Password" htmlFor="signup-password">
-        <input
-          id="signup-password"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className={inputBase}
-          autoComplete="new-password"
-        />
-      </Field>
-      <Field label="Confirm password" htmlFor="signup-confirm">
-        <input
-          id="signup-confirm"
-          type="password"
-          required
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          className={inputBase}
-          autoComplete="new-password"
-        />
-      </Field>
-      {error ? (
-        <p className="text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <Button size="lg" type="submit" disabled={submitting}>
-        {submitting ? "Creating account…" : "Create account"}
-      </Button>
+    <form onSubmit={handleSubmit}>
+      <FieldGroup>
+        <Field data-invalid={invalid || undefined}>
+          <FieldLabel htmlFor="signup-email">Email</FieldLabel>
+          <Input
+            id="signup-email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@berkeley.edu"
+            autoComplete="email"
+            autoFocus
+            aria-invalid={invalid || undefined}
+          />
+        </Field>
+        <Field data-invalid={invalid || undefined}>
+          <FieldLabel htmlFor="signup-password">Password</FieldLabel>
+          <Input
+            id="signup-password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            aria-invalid={invalid || undefined}
+          />
+          <FieldDescription>
+            At least {MIN_PASSWORD} characters.
+          </FieldDescription>
+        </Field>
+        <Field data-invalid={invalid || undefined}>
+          <FieldLabel htmlFor="signup-confirm">Confirm password</FieldLabel>
+          <Input
+            id="signup-confirm"
+            type="password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="new-password"
+            aria-invalid={invalid || undefined}
+          />
+          <FieldError>{error ?? undefined}</FieldError>
+        </Field>
+        <Button type="submit" size="lg" disabled={submitting}>
+          {submitting ? "Creating account…" : "Create account"}
+        </Button>
+      </FieldGroup>
     </form>
   );
 }

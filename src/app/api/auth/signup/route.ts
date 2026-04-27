@@ -14,9 +14,13 @@ function isValidEmail(s: string): boolean {
 }
 
 export async function POST(req: Request) {
-  let body: { email?: unknown; password?: unknown };
+  let body: { email?: unknown; password?: unknown; role?: unknown };
   try {
-    body = (await req.json()) as { email?: unknown; password?: unknown };
+    body = (await req.json()) as {
+      email?: unknown;
+      password?: unknown;
+      role?: unknown;
+    };
   } catch {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
@@ -24,9 +28,15 @@ export async function POST(req: Request) {
   const email =
     typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  const rawRole = typeof body.role === "string" ? body.role : "";
+  const role: "renter" | "landlord" | null =
+    rawRole === "renter" || rawRole === "landlord" ? rawRole : null;
 
   if (!isValidEmail(email)) {
-    return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Enter a valid email." },
+      { status: 400 }
+    );
   }
   if (password.length < MIN_PASSWORD) {
     return NextResponse.json(
@@ -46,6 +56,7 @@ export async function POST(req: Request) {
     email,
     password,
     email_confirm: true,
+    user_metadata: role ? { role } : {},
   });
 
   if (error) {
@@ -56,7 +67,10 @@ export async function POST(req: Request) {
       msg.includes("duplicate")
     ) {
       return NextResponse.json(
-        { error: "An account with this email already exists. Try signing in." },
+        {
+          error:
+            "An account with this email already exists. Try signing in.",
+        },
         { status: 409 }
       );
     }

@@ -1,4 +1,22 @@
 import Link from "next/link";
+import { ArrowRight, Heart, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { LandlordListingsClient } from "./LandlordListingsClient";
 import type {
   LandlordListingActivity,
   RenterProfileRow,
@@ -10,139 +28,151 @@ export function LandlordPanel({
 }: {
   listings: LandlordListingActivity[];
 }) {
-  if (listings.length === 0) return null;
+  const stats = computeLandlordStats(listings);
 
   return (
-    <section
-      id="landlord"
-      className="scroll-mt-24 rounded-2xl border border-hairline bg-surface"
-    >
-      <div className="border-b border-hairline px-5 py-4">
-        <h2 className="text-[17px] font-semibold tracking-tight">
-          Your listings
-        </h2>
-        <p className="mt-1 text-[13px] text-muted">
-          Submissions and renter swipe activity on each place. &ldquo;Swipes&rdquo;
-          counts renters who saw your card and chose left or right.
-        </p>
-      </div>
-      <div className="divide-y divide-hairline">
-        {listings.map((L) => (
-          <LandlordListingCard key={L.id} listing={L} />
-        ))}
-      </div>
-      <div className="border-t border-hairline px-5 py-4">
-        <Link
-          href="/for-landlords/onboard"
-          className="text-[13px] font-medium text-accent underline-offset-4 hover:underline"
-        >
-          Submit another listing →
-        </Link>
-      </div>
+    <section id="landlord" className="scroll-mt-24">
+      <SectionHeader
+        eyebrow="Landlord"
+        title="Your listings"
+        description="Submissions and renter swipe activity on each place."
+      />
+
+      {listings.length > 0 ? (
+        <Card className="mt-6 p-0">
+          <CardContent className="px-5 py-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              <StatTile label="Listings" value={stats.total} />
+              <StatTile
+                label="Approved"
+                value={stats.approved}
+                hint={
+                  stats.pending > 0
+                    ? `${stats.pending} pending`
+                    : undefined
+                }
+              />
+              <StatTile label="Total swipes" value={stats.swipes} />
+              <StatTile
+                label="Saves"
+                value={stats.saves}
+                accent
+                hint={
+                  stats.swipes > 0
+                    ? `${stats.conversion}% save rate`
+                    : undefined
+                }
+              />
+              <StatTile label="Passes" value={stats.passes} />
+              <StatTile
+                label="Awaiting reply"
+                value={stats.notifiedSaves}
+                hint="Renter saves emailed to you"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <LandlordListingsClient listings={listings} />
+
+      {listings.length > 0 ? (
+        <div className="mt-6">
+          <Button
+            variant="outline"
+            render={<Link href="/for-landlords/onboard" />}
+            nativeButton={false}
+          >
+            Submit another listing
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function LandlordListingCard({ listing: L }: { listing: LandlordListingActivity }) {
-  const rows = L.matches ?? [];
-  const saves = rows.filter((m) => m.direction === "right");
-  const passes = rows.filter((m) => m.direction === "left");
-  const thumb = L.photo_urls?.[0] ?? L.video_url ?? null;
+type LandlordStats = {
+  total: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  swipes: number;
+  saves: number;
+  passes: number;
+  conversion: number;
+  notifiedSaves: number;
+};
 
-  return (
-    <div className="px-5 py-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        {thumb ? (
-          <img
-            src={thumb}
-            alt=""
-            className="h-24 w-36 shrink-0 rounded-xl object-cover sm:h-28 sm:w-40"
-          />
-        ) : (
-          <div className="h-24 w-36 shrink-0 rounded-xl bg-hairline sm:h-28 sm:w-40" />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[16px] font-semibold tracking-tight">
-              {L.address ?? "Listing"}
-            </h3>
-            <span className="rounded-full border border-hairline px-2 py-0.5 text-[11px] font-medium capitalize text-muted">
-              {L.status}
-            </span>
-          </div>
-          <p className="mt-1 text-[13px] text-muted">
-            {L.rent != null ? `$${L.rent.toLocaleString()}/mo` : "—"} ·{" "}
-            {L.bedrooms ?? "?"}BR · {L.bathrooms ?? "?"} bath · Submitted{" "}
-            {new Date(L.created_at).toLocaleDateString()}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <StatPill label="Swipes" value={rows.length} />
-            <StatPill label="Saves" value={saves.length} accent />
-            <StatPill label="Passes" value={passes.length} />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h4 className="text-[13px] font-semibold tracking-tight text-foreground">
-          Renters who saved this listing
-        </h4>
-        {saves.length === 0 ? (
-          <p className="mt-2 text-[13px] text-muted">
-            No saves yet. When your listing is approved, renters can swipe on
-            it in Browse.
-          </p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full divide-y divide-hairline text-sm">
-              <thead className="text-left text-[11px] uppercase tracking-widest text-muted">
-                <tr>
-                  <th className="py-2 pr-4">Saved</th>
-                  <th className="py-2 pr-4">Budget</th>
-                  <th className="py-2 pr-4">Move</th>
-                  <th className="py-2">Areas</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {saves.map((m, i) => (
-                  <tr key={`${L.id}-save-${m.created_at}-${i}`}>
-                    <td className="py-2 pr-4 whitespace-nowrap text-muted">
-                      {new Date(m.created_at).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="py-2 pr-4">{formatBudgetCell(m.renters)}</td>
-                    <td className="py-2 pr-4">
-                      {m.renters?.move_date ?? "—"}
-                    </td>
-                    <td className="py-2 text-muted">
-                      {(m.renters?.neighborhoods ?? []).join(", ") || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+function computeLandlordStats(
+  listings: LandlordListingActivity[]
+): LandlordStats {
+  let approved = 0;
+  let pending = 0;
+  let rejected = 0;
+  let swipes = 0;
+  let saves = 0;
+  let passes = 0;
+  for (const L of listings) {
+    if (L.status === "approved") approved += 1;
+    else if (L.status === "pending") pending += 1;
+    else if (L.status === "rejected") rejected += 1;
+    const rows = L.matches ?? [];
+    swipes += rows.length;
+    for (const m of rows) {
+      if (m.direction === "right") saves += 1;
+      else if (m.direction === "left") passes += 1;
+    }
+  }
+  return {
+    total: listings.length,
+    approved,
+    pending,
+    rejected,
+    swipes,
+    saves,
+    passes,
+    conversion: swipes > 0 ? Math.round((saves / swipes) * 100) : 0,
+    notifiedSaves: saves,
+  };
 }
 
-function formatBudgetCell(
-  renter: {
-    budget_min: number | null;
-    budget_max: number | null;
-  } | null
-): string {
-  if (!renter) return "—";
-  if (renter.budget_min != null && renter.budget_max != null) {
-    return `$${renter.budget_min}–$${renter.budget_max}`;
-  }
-  return "—";
+function StatTile({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={
+        "rounded-xl border px-4 py-3 " +
+        (accent
+          ? "border-brand/40 bg-brand-soft text-brand-ink"
+          : "border-border bg-card")
+      }
+    >
+      <p
+        className="font-mono text-[10px] uppercase tracking-[0.22em]
+          text-muted-foreground"
+      >
+        {label}
+      </p>
+      <p
+        className="mt-1 font-display text-[24px] leading-none tracking-tight"
+        style={{ fontVariationSettings: "'opsz' 144" }}
+      >
+        {value}
+      </p>
+      {hint ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+      ) : null}
+    </div>
+  );
 }
 
 export function RenterPanel({
@@ -156,179 +186,232 @@ export function RenterPanel({
   const passed = rows.filter((r) => r.direction === "left").length;
 
   return (
-    <section
-      id="renter"
-      className="scroll-mt-24 rounded-2xl border border-hairline bg-surface"
-    >
-      <div className="border-b border-hairline px-5 py-4">
-        <h2 className="text-[17px] font-semibold tracking-tight">
-          Renter profile &amp; swipes
-        </h2>
-        <p className="mt-1 text-[13px] text-muted">
-          Your search preferences and every swipe on Browse.
-        </p>
+    <section id="renter" className="scroll-mt-24">
+      <SectionHeader
+        eyebrow="Renter"
+        title="Your search"
+        description="Preferences and every swipe you've made on Browse."
+      />
+
+      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b pb-4">
+            <CardTitle>Preferences</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {profile ? (
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                <ProfileItem
+                  label="Budget"
+                  value={
+                    profile.budget_min != null && profile.budget_max != null
+                      ? `$${profile.budget_min}–$${profile.budget_max}`
+                      : "—"
+                  }
+                />
+                <ProfileItem
+                  label="Move date"
+                  value={profile.move_date ?? "—"}
+                />
+                <ProfileItem
+                  label="Roommates"
+                  value={String(profile.roommates ?? "—")}
+                />
+                <ProfileItem
+                  label="Neighborhoods"
+                  value={(profile.neighborhoods ?? []).join(", ") || "—"}
+                />
+                <ProfileItem
+                  label="Dealbreakers"
+                  value={(profile.dealbreakers ?? []).join(", ") || "—"}
+                />
+                <ProfileItem
+                  label="Ideal place"
+                  value={profile.description ?? "—"}
+                />
+              </div>
+            ) : (
+              <p className="text-[13px] text-muted-foreground">
+                You haven&rsquo;t completed renter onboarding yet.
+              </p>
+            )}
+            <div className="mt-5">
+              <Button
+                size="sm"
+                variant="outline"
+                render={<Link href="/for-renters/onboard" />}
+                nativeButton={false}
+              >
+                {profile ? "Update preferences" : "Set preferences"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b pb-4">
+            <CardTitle>Swipe summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <StatPill label="Saved" value={saved} accent />
+              <StatPill label="Passed" value={passed} />
+              <StatPill label="Total swipes" value={rows.length} />
+            </div>
+            <div className="mt-5">
+              <Button
+                size="sm"
+                render={<Link href="/listings" />}
+                nativeButton={false}
+              >
+                Browse listings
+                <ArrowRight />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="border-b border-hairline px-5 py-6">
-        <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
-          Profile
-        </h3>
-        {profile ? (
-          <div className="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-            <ProfileItem
-              label="Budget"
-              value={
-                profile.budget_min != null && profile.budget_max != null
-                  ? `$${profile.budget_min}–$${profile.budget_max}`
-                  : "—"
-              }
-            />
-            <ProfileItem label="Move date" value={profile.move_date ?? "—"} />
-            <ProfileItem
-              label="Roommates"
-              value={String(profile.roommates ?? "—")}
-            />
-            <ProfileItem
-              label="Neighborhoods"
-              value={(profile.neighborhoods ?? []).join(", ") || "—"}
-            />
-            <ProfileItem
-              label="Dealbreakers"
-              value={(profile.dealbreakers ?? []).join(", ") || "—"}
-            />
-            <ProfileItem
-              label="Ideal place"
-              value={profile.description ?? "—"}
-            />
-          </div>
-        ) : (
-          <p className="mt-3 text-[13px] text-muted">
-            You have not completed renter onboarding yet.
-          </p>
-        )}
-        <Link
-          href="/for-renters/onboard"
-          className="mt-4 inline-block text-[13px] font-medium text-accent underline-offset-4 hover:underline"
-        >
-          {profile ? "Update preferences →" : "Set preferences →"}
-        </Link>
-      </div>
-
-      <div className="px-5 py-4">
-        <div className="flex flex-wrap gap-2">
-          <StatPill label="Saved" value={saved} accent />
-          <StatPill label="Passed" value={passed} />
-          <StatPill label="Total swipes" value={rows.length} />
-        </div>
-      </div>
-
-      <div className="border-t border-hairline px-5 py-4">
-        <h3 className="text-[15px] font-semibold tracking-tight">
-          Swipe activity
-        </h3>
-        <p className="mt-1 text-[13px] text-muted">
-          Newest first. Detail shows when the listing is still in the database.
-        </p>
-      </div>
-      {rows.length === 0 ? (
-        <p className="px-5 pb-10 text-center text-sm text-muted">
-          {profile
-            ? "No swipes yet. Open Browse to start."
-            : "Complete preferences, then browse listings to swipe."}
-        </p>
-      ) : (
-        <div className="overflow-x-auto px-0 pb-6">
-          <table className="min-w-full divide-y divide-hairline text-sm">
-            <thead className="bg-background/60 text-left text-[11px] uppercase tracking-widest text-muted">
-              <tr>
-                <th className="px-4 py-3">Action</th>
-                <th className="px-4 py-3">Address</th>
-                <th className="px-4 py-3">Rent</th>
-                <th className="px-4 py-3">Layout</th>
-                <th className="px-4 py-3">Listing</th>
-                <th className="px-4 py-3">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
-              {rows.map((r) => {
-                const Li = r.listings;
-                const thumb = Li?.photo_urls?.[0] ?? Li?.video_url ?? null;
-                return (
-                  <tr
-                    key={`${r.listing_id}-${r.created_at}`}
-                    className="align-middle"
-                  >
-                    <td className="px-4 py-3">
-                      <span
-                        className={
-                          r.direction === "right"
-                            ? "rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-accent-hover"
-                            : "rounded-full border border-hairline px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted"
-                        }
-                      >
-                        {r.direction === "right" ? "Saved" : "Passed"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {thumb ? (
-                          <img
-                            src={thumb}
-                            alt=""
-                            className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <span className="h-10 w-10 shrink-0 rounded-lg bg-hairline" />
-                        )}
-                        <span className="max-w-[200px] truncate">
-                          {Li?.address ?? "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {Li?.rent != null ? `$${Li.rent.toLocaleString()}` : "—"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {Li
-                        ? `${Li.bedrooms ?? "?"}BR · ${Li.bathrooms ?? "?"} bath`
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 capitalize text-muted">
-                      {Li?.status ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted">
-                      {new Date(r.created_at).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="border-t border-hairline px-5 py-4">
-        <Link
-          href="/listings"
-          className="inline-flex w-fit items-center justify-center rounded-full border border-hairline bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30"
-        >
-          Browse listings
-        </Link>
-      </div>
+      <Card className="mt-5 p-0">
+        <CardHeader className="border-b px-5 pb-4 pt-4">
+          <CardTitle>Swipe activity</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          {rows.length === 0 ? (
+            <p
+              className="px-5 py-10 text-center text-sm text-muted-foreground"
+            >
+              {profile
+                ? "No swipes yet. Open Browse to start."
+                : "Complete preferences, then browse listings to swipe."}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-5">Action</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Rent</TableHead>
+                    <TableHead>Layout</TableHead>
+                    <TableHead>Listing</TableHead>
+                    <TableHead className="pr-5">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => {
+                    const Li = r.listings;
+                    const thumb =
+                      Li?.photo_urls?.[0] ?? Li?.video_url ?? null;
+                    return (
+                      <TableRow key={`${r.listing_id}-${r.created_at}`}>
+                        <TableCell className="pl-5">
+                          {r.direction === "right" ? (
+                            <Badge
+                              className="bg-brand-soft text-brand-ink"
+                              variant="outline"
+                            >
+                              <Heart className="size-3" /> Saved
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">
+                              <X className="size-3" /> Passed
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                alt=""
+                                className="size-9 shrink-0 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <span
+                                className="size-9 shrink-0 rounded-lg bg-muted"
+                              />
+                            )}
+                            <span className="max-w-[200px] truncate">
+                              {Li?.address ?? "—"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {Li?.rent != null
+                            ? `$${Li.rent.toLocaleString()}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {Li
+                            ? `${Li.bedrooms ?? "?"}BR · ${
+                                Li.bathrooms ?? "?"
+                              } bath`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="capitalize text-muted-foreground">
+                          {Li?.status ?? "—"}
+                        </TableCell>
+                        <TableCell
+                          className="whitespace-nowrap pr-5
+                            text-muted-foreground"
+                        >
+                          {new Date(r.created_at).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </section>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <p
+        className="font-mono text-[11px] uppercase tracking-[0.22em]
+          text-muted-foreground"
+      >
+        {eyebrow}
+      </p>
+      <h2
+        className="mt-2 font-display text-[28px] leading-[1.1] tracking-tight"
+        style={{ fontVariationSettings: "'opsz' 144" }}
+      >
+        {title}
+      </h2>
+      <p className="mt-2 text-[14px] text-muted-foreground">{description}</p>
+    </div>
   );
 }
 
 function ProfileItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-widest text-muted">
+      <p
+        className="font-mono text-[10px] uppercase tracking-[0.22em]
+          text-muted-foreground"
+      >
         {label}
       </p>
       <p className="mt-1 text-sm text-foreground">{value}</p>
@@ -348,13 +431,13 @@ function StatPill({
   return (
     <div
       className={
-        "rounded-full border px-4 py-2 text-sm " +
+        "rounded-full border px-4 py-1.5 text-sm " +
         (accent
-          ? "border-accent/40 bg-accent-soft text-accent-hover"
-          : "border-hairline bg-surface text-foreground")
+          ? "border-brand/30 bg-brand-soft text-brand-ink"
+          : "border-border bg-card text-foreground")
       }
     >
-      <span className="text-muted">{label}</span>{" "}
+      <span className="text-muted-foreground">{label}</span>{" "}
       <strong className="text-foreground">{value}</strong>
     </div>
   );

@@ -2,12 +2,20 @@ import { redirect } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import {
+  Empty,
+  EmptyContent,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Inbox } from "lucide-react";
+import {
   getTopK,
   type Listing as MatchListing,
   type RenterProfile,
 } from "@/lib/matching/scoreMatch";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/supabaseServer";
+import { resolveUserRole } from "@/lib/userRole";
 import { ListingsSwipe, type Listing } from "./ListingsSwipe";
 
 export const metadata = { title: "Listings — Setl" };
@@ -109,6 +117,12 @@ export default async function ListingsPage() {
   if (!user) {
     redirect("/login?redirect=/listings");
   }
+
+  const role = await resolveUserRole(user);
+  if (role === "landlord") {
+    redirect("/dashboard");
+  }
+
   const renter = await getRenterProfile(user.id);
   if (!renter) {
     redirect("/for-renters/onboard");
@@ -138,16 +152,25 @@ export default async function ListingsPage() {
       <Header />
       <main className="grain relative flex-1">
         <div className="mx-auto w-full max-w-3xl px-6 pt-10 pb-16">
-          <div className="mb-6 flex items-baseline justify-between">
+          <div className="mb-8 flex items-baseline justify-between gap-4">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
+              <p
+                className="font-mono text-[11px] uppercase tracking-[0.22em]
+                  text-muted-foreground"
+              >
                 Verified listings
               </p>
-              <h1 className="mt-2 text-[28px] font-semibold tracking-tight">
+              <h1
+                className="mt-2 font-display text-[32px] leading-[1.05]
+                  tracking-tight sm:text-[40px]"
+                style={{ fontVariationSettings: "'opsz' 144, 'SOFT' 60" }}
+              >
                 Swipe through Berkeley
               </h1>
             </div>
-            <span className="text-[13px] text-muted">
+            <span
+              className="hidden text-[12px] text-muted-foreground sm:block"
+            >
               Right to save · Left to pass
             </span>
           </div>
@@ -165,21 +188,16 @@ export default async function ListingsPage() {
 
 function EmptyMatchedListings({ email }: { email: string }) {
   return (
-    <div
-      className="mx-auto flex w-full max-w-md flex-col items-center gap-4
-        rounded-[28px] border border-hairline bg-surface px-8 py-16 text-center"
-    >
-      <span className="font-mono text-[11px] uppercase tracking-widest text-muted">
-        Setl matching
-      </span>
-      <h2 className="text-[24px] font-semibold tracking-tight">
-        We&rsquo;re adding more verified listings soon
-      </h2>
-      <p className="max-w-sm text-[14px] leading-[1.6] text-muted">
+    <Empty className="border border-dashed border-border bg-card">
+      <EmptyMedia variant="icon">
+        <Inbox strokeWidth={1.5} />
+      </EmptyMedia>
+      <EmptyTitle>More verified listings coming soon</EmptyTitle>
+      <EmptyContent>
         We didn&rsquo;t find enough strong matches yet. We&rsquo;ll notify{" "}
         <strong className="text-foreground">{email}</strong> when better fits
         come in.
-      </p>
-    </div>
+      </EmptyContent>
+    </Empty>
   );
 }

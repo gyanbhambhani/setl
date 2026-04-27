@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { SetlWordmark } from "@/components/SetlLogo";
 import { getSession } from "@/lib/supabaseServer";
 
 export async function Header() {
@@ -8,104 +10,89 @@ export async function Header() {
   } catch {
     user = null;
   }
+  const logoHref = user ? "/dashboard" : "/";
+
   return (
-    <header className="border-b border-hairline">
+    <header
+      className="sticky top-0 z-30 border-b border-border/70
+        bg-background/80 backdrop-blur"
+    >
       <div
         className="mx-auto flex w-full max-w-6xl items-center justify-between
-          px-6 py-5"
+          gap-6 px-6 py-4"
       >
-        <Link href="/" className="flex items-center gap-2">
-          <Logo />
-          <span className="text-[15px] font-semibold tracking-tight">
-            Setl
-          </span>
+        <Link
+          href={logoHref}
+          className="group inline-flex items-center"
+          aria-label="Setl home"
+        >
+          <SetlWordmark className="text-[26px]" />
         </Link>
-        <nav className="flex items-center gap-6 text-sm text-foreground/70">
-          <Link
-            href="/for-renters"
-            className="transition-colors hover:text-foreground"
-          >
-            For renters
-          </Link>
-          <Link
-            href="/for-landlords"
-            className="transition-colors hover:text-foreground"
-          >
-            For landlords
-          </Link>
+        <nav
+          className="flex items-center gap-1 text-sm"
+          aria-label="Primary"
+        >
           {user ? (
             <>
-              <Link
-                href="/dashboard"
-                className="transition-colors hover:text-foreground"
-                title={user.email ?? "Signed in"}
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/profile"
-                className="transition-colors hover:text-foreground"
-                title={user.email ?? "Signed in"}
+              <Button
+                variant="ghost"
+                size="sm"
+                render={
+                  <Link href="/profile" title={user.email ?? "Signed in"} />
+                }
+                nativeButton={false}
               >
                 Profile
-              </Link>
+              </Button>
               <form action="/api/auth/signout" method="post">
-                <button
+                <Button
                   type="submit"
-                  className="text-sm text-foreground/70 transition-colors
-                    hover:text-foreground"
+                  variant="ghost"
+                  size="sm"
                   title={user.email ?? "Signed in"}
                 >
                   Sign out
-                </button>
+                </Button>
               </form>
             </>
           ) : (
             <>
-              <Link
-                href="/login"
-                className="rounded-full border border-hairline px-3.5 py-1.5
-                  text-sm transition-colors hover:border-foreground/30"
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link href="/for-renters" />}
+                nativeButton={false}
+              >
+                For renters
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link href="/for-landlords" />}
+                nativeButton={false}
+              >
+                For landlords
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link href="/login" />}
+                nativeButton={false}
               >
                 Sign in
-              </Link>
-              <Link
-                href="/signup"
-                className="rounded-full bg-accent px-3.5 py-1.5 text-sm font-medium
-                  text-[#fafaf8] transition-colors hover:bg-accent-hover"
+              </Button>
+              <Button
+                size="sm"
+                className="ml-1"
+                render={<Link href="/signup" />}
+                nativeButton={false}
               >
                 Sign up
-              </Link>
+              </Button>
             </>
           )}
         </nav>
       </div>
     </header>
-  );
-}
-
-export function Logo({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={
-        "inline-flex h-7 w-7 items-center justify-center rounded-lg " +
-        "bg-accent text-[#fafaf8] " +
-        (className ?? "")
-      }
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M3 11.5L12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"
-          fill="currentColor"
-        />
-      </svg>
-    </span>
   );
 }

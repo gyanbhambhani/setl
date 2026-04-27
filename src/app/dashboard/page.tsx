@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { ArrowRight, Building2, Compass } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { getSession } from "@/lib/supabaseServer";
+import { readIntent, resolveUserRole } from "@/lib/userRole";
 import { LandlordPanel, RenterPanel } from "./DashboardPanels";
 import {
   loadLandlordActivity,
@@ -19,75 +23,168 @@ export default async function DashboardPage() {
     redirect("/login?redirect=/dashboard");
   }
 
-  const [landlordListings, renterProfile] = await Promise.all([
-    loadLandlordActivity(user.id),
+  const role = await resolveUserRole(user);
+
+  if (role === "new") {
+    return <NewUserDashboard email={user.email ?? ""} intent={readIntent(user)} />;
+  }
+
+  if (role === "renter") {
+    const profile = await loadRenterProfile(user.id);
+    const swipes = profile ? await loadRenterSwipes(profile.id) : [];
+    return (
+      <Shell email={user.email ?? ""} subtitle="Your search and swipes.">
+        <RenterPanel profile={profile} rows={swipes} />
+      </Shell>
+    );
+  }
+
+  if (role === "landlord") {
+    const listings = await loadLandlordActivity(user.id);
+    return (
+      <Shell
+        email={user.email ?? ""}
+        subtitle="Your submissions and renter interest."
+      >
+        <LandlordPanel listings={listings} />
+      </Shell>
+    );
+  }
+
+  // role === "both" — explicit double profile
+  const [profile, listings] = await Promise.all([
     loadRenterProfile(user.id),
+    loadLandlordActivity(user.id),
   ]);
+  const swipes = profile ? await loadRenterSwipes(profile.id) : [];
+  return (
+    <Shell
+      email={user.email ?? ""}
+      subtitle="Renter and landlord activity in one place."
+      nav={[
+        { href: "#renter", label: "Renter" },
+        { href: "#landlord", label: "Landlord" },
+      ]}
+    >
+      <div className="flex flex-col gap-12">
+        <RenterPanel profile={profile} rows={swipes} />
+        <LandlordPanel listings={listings} />
+      </div>
+    </Shell>
+  );
+}
 
-  const swipes = renterProfile
-    ? await loadRenterSwipes(renterProfile.id)
-    : [];
-
-  const hasLandlord = landlordListings.length > 0;
-  const hasRenter = renterProfile !== null;
-
+function Shell({
+  email,
+  subtitle,
+  children,
+  nav,
+}: {
+  email: string;
+  subtitle: string;
+  children: React.ReactNode;
+  nav?: { href: string; label: string }[];
+}) {
   return (
     <>
       <Header />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-14">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:py-16">
+        <div
+          className="flex flex-col gap-4 sm:flex-row sm:items-end
+            sm:justify-between"
+        >
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
+            <p
+              className="font-mono text-[11px] uppercase tracking-[0.22em]
+                text-muted-foreground"
+            >
               Your Setl
             </p>
-            <h1 className="mt-2 text-[34px] font-semibold tracking-tight">
+            <h1
+              className="mt-3 font-display text-[40px] leading-[1.05]
+                tracking-tight sm:text-[48px]"
+              style={{ fontVariationSettings: "'opsz' 144, 'SOFT' 60" }}
+            >
               Dashboard
             </h1>
-            <p className="mt-2 text-[15px] text-muted">
-              {hasLandlord && hasRenter
-                ? "Landlord activity and renter swipes — jump to a section below."
-                : hasLandlord
-                  ? "Your submissions and renter interest."
-                  : hasRenter
-                    ? "Your profile and swipe history."
-                    : "Get started as a renter, landlord, or both."}
+            <p className="mt-2 text-[15px] text-muted-foreground">
+              {email ? <span>Signed in as <strong>{email}</strong>. </span> : null}
+              {subtitle}
             </p>
           </div>
-          {hasLandlord && hasRenter ? (
-            <nav className="flex flex-wrap gap-2 text-[13px] font-medium">
-              <a
-                href="#renter"
-                className="rounded-full border border-hairline bg-surface px-3 py-1.5 text-foreground hover:border-foreground/30"
-              >
-                Profile &amp; swipes
-              </a>
-              <a
-                href="#landlord"
-                className="rounded-full border border-hairline bg-surface px-3 py-1.5 text-foreground hover:border-foreground/30"
-              >
-                My listings
-              </a>
+          {nav?.length ? (
+            <nav
+              className="flex flex-wrap gap-2 text-[13px] font-medium"
+              aria-label="Sections"
+            >
+              {nav.map((n) => (
+                <Button
+                  key={n.href}
+                  variant="outline"
+                  size="sm"
+                  render={<a href={n.href} />}
+                  nativeButton={false}
+                >
+                  {n.label}
+                </Button>
+              ))}
             </nav>
           ) : null}
         </div>
+        <div className="mt-10">{children}</div>
+      </main>
+      <Footer />
+    </>
+  );
+}
 
-        <div className="mt-10 flex flex-col gap-10">
-          {!hasLandlord && !hasRenter ? (
-            <EmptyOnboarding />
-          ) : (
-            <>
-              {hasRenter ? (
-                <RenterPanel profile={renterProfile} rows={swipes} />
-              ) : (
-                <RenterPrompt />
-              )}
-              {hasLandlord ? (
-                <LandlordPanel listings={landlordListings} />
-              ) : (
-                <LandlordPrompt />
-              )}
-            </>
-          )}
+function NewUserDashboard({
+  email,
+  intent,
+}: {
+  email: string;
+  intent: "renter" | "landlord" | null;
+}) {
+  return (
+    <>
+      <Header />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-20">
+        <p
+          className="font-mono text-[11px] uppercase tracking-[0.22em]
+            text-muted-foreground"
+        >
+          Welcome
+        </p>
+        <h1
+          className="mt-3 font-display text-[40px] leading-[1.05]
+            tracking-tight sm:text-[48px]"
+          style={{ fontVariationSettings: "'opsz' 144, 'SOFT' 60" }}
+        >
+          Let&rsquo;s finish setting up.
+        </h1>
+        <p className="mt-3 text-[15px] text-muted-foreground">
+          Signed in as <strong>{email}</strong>. Pick the path that matches
+          how you&rsquo;ll use Setl.
+        </p>
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <PathCard
+            highlighted={intent === "renter"}
+            href="/for-renters/onboard"
+            eyebrow="Renter"
+            title="Set search preferences"
+            body="Budget, neighborhoods, dealbreakers — then start swiping."
+            cta="Renter setup"
+            Icon={Compass}
+          />
+          <PathCard
+            highlighted={intent === "landlord"}
+            href="/for-landlords/onboard"
+            eyebrow="Landlord"
+            title="List a place"
+            body="Submit photos, address, and rent for verification."
+            cta="List a place"
+            Icon={Building2}
+          />
         </div>
       </main>
       <Footer />
@@ -95,68 +192,65 @@ export default async function DashboardPage() {
   );
 }
 
-function EmptyOnboarding() {
+function PathCard({
+  highlighted,
+  href,
+  eyebrow,
+  title,
+  body,
+  cta,
+  Icon,
+}: {
+  highlighted: boolean;
+  href: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  cta: string;
+  Icon: typeof Building2;
+}) {
   return (
-    <section className="rounded-2xl border border-hairline bg-surface px-6 py-10">
-      <h2 className="text-[19px] font-semibold tracking-tight">
-        Nothing here yet
-      </h2>
-      <p className="mt-2 text-[15px] text-muted">
-        Add renter preferences to swipe listings, or submit a place as a
-        landlord — or do both.
-      </p>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <Link
-          href="/for-renters/onboard"
-          className="inline-flex justify-center rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-[#fafaf8] hover:bg-accent-hover"
+    <Card
+      className={
+        "ring-1 transition-colors " +
+        (highlighted
+          ? "ring-brand/40 shadow-[0_25px_70px_-50px_var(--brand)]"
+          : "ring-foreground/10")
+      }
+    >
+      <CardContent className="flex flex-col gap-4 py-5">
+        <span
+          className="inline-flex size-10 items-center justify-center rounded-xl
+            bg-brand-soft text-brand-ink"
         >
-          Renter setup
-        </Link>
-        <Link
-          href="/for-landlords/onboard"
-          className="inline-flex justify-center rounded-full border border-hairline bg-background px-5 py-2.5 text-sm font-medium text-foreground hover:border-foreground/30"
+          <Icon className="size-5" strokeWidth={1.5} />
+        </span>
+        <div className="space-y-1.5">
+          <p
+            className="font-mono text-[10px] uppercase tracking-[0.22em]
+              text-muted-foreground"
+          >
+            {eyebrow}
+          </p>
+          <h2
+            className="font-display text-[20px] leading-tight tracking-tight"
+            style={{ fontVariationSettings: "'opsz' 144" }}
+          >
+            {title}
+          </h2>
+          <p className="text-[14px] leading-[1.5] text-muted-foreground">
+            {body}
+          </p>
+        </div>
+        <Button
+          className="w-fit"
+          render={<Link href={href} />}
+          nativeButton={false}
         >
-          List a place
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function LandlordPrompt() {
-  return (
-    <section className="rounded-2xl border border-dashed border-hairline bg-background/40 px-6 py-8">
-      <h2 className="text-[16px] font-semibold tracking-tight">
-        Landlord dashboard
-      </h2>
-      <p className="mt-2 text-[14px] text-muted">
-        Submit a listing to track status, saves, and renter interest here.
-      </p>
-      <Link
-        href="/for-landlords/onboard"
-        className="mt-4 inline-flex rounded-full bg-accent px-4 py-2 text-sm font-medium text-[#fafaf8] hover:bg-accent-hover"
-      >
-        Submit a listing
-      </Link>
-    </section>
-  );
-}
-
-function RenterPrompt() {
-  return (
-    <section className="rounded-2xl border border-dashed border-hairline bg-background/40 px-6 py-8">
-      <h2 className="text-[16px] font-semibold tracking-tight">
-        Renter dashboard
-      </h2>
-      <p className="mt-2 text-[14px] text-muted">
-        Set your budget and neighborhoods to unlock Browse and swipe history.
-      </p>
-      <Link
-        href="/for-renters/onboard"
-        className="mt-4 inline-flex rounded-full bg-accent px-4 py-2 text-sm font-medium text-[#fafaf8] hover:bg-accent-hover"
-      >
-        Set preferences
-      </Link>
-    </section>
+          {cta}
+          <ArrowRight />
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

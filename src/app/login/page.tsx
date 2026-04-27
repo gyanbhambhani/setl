@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { Card, CardContent } from "@/components/ui/card";
 import { getSession } from "@/lib/supabaseServer";
 import { LoginForm } from "./LoginForm";
 
@@ -14,35 +15,45 @@ export default async function LoginPage({
 }) {
   const sp = await searchParams;
   const user = await getSession();
-  const redirectTo = sp.redirect ?? "/listings";
+  const redirectTo = sp.redirect ?? "/dashboard";
   if (user) {
     redirect(redirectTo);
   }
 
   const signupHref =
-    sp.redirect && sp.redirect !== "/listings"
+    sp.redirect && sp.redirect !== "/dashboard"
       ? `/signup/register?redirect=${encodeURIComponent(sp.redirect)}`
       : "/signup";
 
   return (
     <>
       <Header />
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-20">
+      <main
+        className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-16
+          sm:py-20"
+      >
         <p
-          className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted"
+          className="font-mono text-[11px] uppercase tracking-[0.22em]
+            text-muted-foreground"
         >
           Setl access
         </p>
-        <h1 className="mt-2 text-[32px] font-semibold tracking-tight">
-          Sign in
+        <h1
+          className="mt-3 font-display text-[36px] leading-[1.05] tracking-tight
+            sm:text-[42px]"
+          style={{ fontVariationSettings: "'opsz' 144" }}
+        >
+          Welcome back
         </h1>
-        <p className="mt-3 text-[15px] leading-[1.6] text-muted">
-          Use the email and password you chose when you signed up.
+        <p className="mt-3 text-[15px] leading-[1.6] text-muted-foreground">
+          Sign in to keep matching with verified Berkeley housing.
         </p>
-        <div className="mt-8">
-          <LoginForm redirectTo={redirectTo} />
-        </div>
-        <p className="mt-8 text-center text-[14px] text-muted">
+        <Card className="mt-8">
+          <CardContent>
+            <LoginForm redirectTo={redirectTo} />
+          </CardContent>
+        </Card>
+        <p className="mt-8 text-center text-[14px] text-muted-foreground">
           New here?{" "}
           <Link
             href={signupHref}

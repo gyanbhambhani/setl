@@ -1,8 +1,21 @@
 "use client";
 
-import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
-import Link from "next/link";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useTransform,
+} from "framer-motion";
+import { Heart, Inbox, ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 export type Listing = {
   id: string;
@@ -44,10 +57,15 @@ export function ListingsSwipe({ listings }: { listings: Listing[] }) {
 
   if (stack.length === 0) {
     return (
-      <EmptyState
-        title="More verified listings coming soon"
-        body="We&rsquo;ll email you the moment a place fits your preferences."
-      />
+      <Empty className="border border-dashed border-border bg-card">
+        <EmptyMedia variant="icon">
+          <Inbox strokeWidth={1.5} />
+        </EmptyMedia>
+        <EmptyTitle>More verified listings coming soon</EmptyTitle>
+        <EmptyContent>
+          We&rsquo;ll email you the moment a place fits your preferences.
+        </EmptyContent>
+      </Empty>
     );
   }
 
@@ -81,17 +99,27 @@ export function ListingsSwipe({ listings }: { listings: Listing[] }) {
           onSwipe={(dir) => handleSwipe(top, dir)}
         />
       </AnimatePresence>
-      <div className="absolute -bottom-16 left-0 right-0 flex items-center justify-center gap-4">
-        <ActionButton
-          label="Pass"
+      <div
+        className="absolute -bottom-20 left-0 right-0 flex items-center
+          justify-center gap-3"
+      >
+        <Button
+          type="button"
+          size="lg"
+          variant="outline"
+          className="h-12 w-32 rounded-full"
           onClick={() => handleSwipe(top, "left")}
-          tone="muted"
-        />
-        <ActionButton
-          label="Save"
+        >
+          <X /> Pass
+        </Button>
+        <Button
+          type="button"
+          size="lg"
+          className="h-12 w-32 rounded-full"
           onClick={() => handleSwipe(top, "right")}
-          tone="accent"
-        />
+        >
+          <Heart /> Save
+        </Button>
       </div>
     </div>
   );
@@ -131,19 +159,20 @@ function SwipeableCard({
       <Card listing={listing} interactive>
         <motion.span
           style={{ opacity: likeOpacity }}
-          className="absolute left-5 top-5 rounded-full border-2 border-accent
-            bg-accent-soft px-3 py-1 font-mono text-[11px] uppercase
-            tracking-widest text-accent-hover"
+          className="absolute left-5 top-5 inline-flex items-center gap-1.5
+            rounded-full border-2 border-brand bg-brand-soft px-3 py-1
+            font-mono text-[11px] uppercase tracking-[0.22em] text-brand-ink"
         >
-          Save
+          <Heart className="size-3" /> Save
         </motion.span>
         <motion.span
           style={{ opacity: passOpacity }}
-          className="absolute right-5 top-5 rounded-full border-2 border-foreground/40
-            bg-background px-3 py-1 font-mono text-[11px] uppercase
-            tracking-widest text-foreground/80"
+          className="absolute right-5 top-5 inline-flex items-center gap-1.5
+            rounded-full border-2 border-foreground/40 bg-background px-3
+            py-1 font-mono text-[11px] uppercase tracking-[0.22em]
+            text-foreground/80"
         >
-          Pass
+          <X className="size-3" /> Pass
         </motion.span>
       </Card>
     </motion.div>
@@ -163,8 +192,9 @@ function Card({
   return (
     <div
       className={
-        "relative flex h-full w-full flex-col overflow-hidden rounded-[28px]" +
-        " border border-hairline bg-surface shadow-[0_30px_80px_-40px_rgba(26,26,26,0.25)]" +
+        "relative flex h-full w-full flex-col overflow-hidden rounded-3xl" +
+        " border border-border bg-card" +
+        " shadow-[0_30px_80px_-40px_rgba(26,26,26,0.25)]" +
         (interactive ? " cursor-grab active:cursor-grabbing" : "")
       }
     >
@@ -181,118 +211,55 @@ function Card({
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(60% 50% at 30% 30%, #5c7a5c 0%, #1a1a1a 70%)",
+                "radial-gradient(60% 50% at 30% 30%, #5c7a5c 0%, " +
+                "#1a1a1a 70%)",
             }}
           />
         )}
         <span
-          className="absolute left-4 top-4 inline-flex items-center gap-2
-            rounded-full bg-black/45 px-3 py-1 font-mono text-[10px]
-            uppercase tracking-widest text-[#fafaf8] backdrop-blur-sm"
+          className="absolute left-4 top-4 inline-flex items-center gap-1.5
+            rounded-full bg-black/45 px-2.5 py-1 font-mono text-[10px]
+            uppercase tracking-[0.22em] text-[#fafaf8] backdrop-blur-sm"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Verified
+          <ShieldCheck className="size-3" /> Verified
         </span>
         {children}
       </div>
       <div className="flex flex-col gap-3 p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className="text-[19px] font-semibold tracking-tight">
+          <h3
+            className="font-display text-[20px] leading-tight tracking-tight"
+            style={{ fontVariationSettings: "'opsz' 144" }}
+          >
             {listing.bedrooms ?? "?"}BR · {listing.neighborhood ?? "Berkeley"}
           </h3>
           <span className="text-[18px] font-medium tracking-tight">
-            {listing.rent != null
-              ? `$${listing.rent.toLocaleString()}`
-              : "—"}
+            {listing.rent != null ? `$${listing.rent.toLocaleString()}` : "—"}
           </span>
         </div>
-        <p className="text-[13px] text-muted">
+        <p className="text-[13px] text-muted-foreground">
           {listing.address ?? "Address available after intro"}
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Tag>{listing.bathrooms ?? "?"} bath</Tag>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="outline" className="font-normal">
+            {listing.bathrooms ?? "?"} bath
+          </Badge>
           {listing.available_date ? (
-            <Tag>
+            <Badge variant="outline" className="font-normal">
               Available{" "}
               {new Date(listing.available_date).toLocaleDateString(undefined, {
                 month: "short",
                 day: "numeric",
               })}
-            </Tag>
+            </Badge>
           ) : null}
-          {(listing.amenities ?? []).slice(0, 2).map((a) => (
-            <Tag key={a}>{a.replace(/_/g, " ")}</Tag>
+          {(listing.amenities ?? []).slice(0, 3).map((a) => (
+            <Badge variant="outline" className="font-normal" key={a}>
+              {a.replace(/_/g, " ")}
+            </Badge>
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Tag({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="rounded-full border border-hairline px-2.5 py-1 text-[11px]
-        uppercase tracking-wide text-foreground/70"
-    >
-      {children}
-    </span>
-  );
-}
-
-function ActionButton({
-  label,
-  tone,
-  onClick,
-}: {
-  label: string;
-  tone: "muted" | "accent";
-  onClick: () => void;
-}) {
-  const cls =
-    tone === "accent"
-      ? "border-accent bg-accent text-[#fafaf8]"
-      : "border-hairline bg-surface text-foreground";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-12 w-32 rounded-full border text-sm font-medium ${cls}`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function EmptyState({
-  title,
-  body,
-  cta,
-}: {
-  title: string;
-  body: string;
-  cta?: { href: string; label: string };
-}) {
-  return (
-    <div
-      className="mx-auto flex w-full max-w-md flex-col items-center gap-4
-        rounded-[28px] border border-hairline bg-surface px-8 py-16 text-center"
-    >
-      <span
-        className="font-mono text-[11px] uppercase tracking-widest text-muted"
-      >
-        Setl
-      </span>
-      <h2 className="text-[24px] font-semibold tracking-tight">{title}</h2>
-      <p className="max-w-sm text-[14px] leading-[1.6] text-muted">{body}</p>
-      {cta ? (
-        <Link
-          href={cta.href}
-          className="mt-2 inline-flex h-11 items-center justify-center rounded-full
-            bg-accent px-5 text-sm font-medium text-[#fafaf8] hover:bg-accent-hover"
-        >
-          {cta.label}
-        </Link>
-      ) : null}
     </div>
   );
 }

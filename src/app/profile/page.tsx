@@ -1,9 +1,27 @@
 import Link from "next/link";
+import { ArrowRight, Building2, Compass } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/supabaseServer";
+import { readIntent, resolveUserRole } from "@/lib/userRole";
 
 export const metadata = { title: "Profile — Setl" };
 export const dynamic = "force-dynamic";
@@ -30,9 +48,9 @@ type ListingProfile = {
   created_at: string;
 };
 
-async function loadProfile(userId: string) {
+async function loadRenter(userId: string): Promise<RenterProfile | null> {
   const supabase = getSupabaseAdmin();
-  const { data: renterRaw } = await supabase
+  const { data } = await supabase
     .from("renters")
     .select(
       "id, budget_min, budget_max, move_date, roommates, neighborhoods, " +
@@ -40,32 +58,31 @@ async function loadProfile(userId: string) {
     )
     .eq("user_id", userId)
     .maybeSingle();
-  const renter = (renterRaw as unknown as RenterProfile | null) ?? null;
+  return (data as unknown as RenterProfile | null) ?? null;
+}
 
-  const { data: listingsRaw } = await supabase
+async function loadListings(userId: string): Promise<ListingProfile[]> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
     .from("listings")
     .select("id, address, rent, status, bedrooms, bathrooms, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  const listings = (listingsRaw as unknown as ListingProfile[]) ?? [];
+  return (data as unknown as ListingProfile[]) ?? [];
+}
 
-  let swipeSummary = { right: 0, left: 0 };
-  if (renter?.id) {
-    const { data: matchesRaw } = await supabase
-      .from("matches")
-      .select("direction")
-      .eq("renter_id", renter.id);
-    const matches =
-      (matchesRaw as unknown as Array<{ direction: "left" | "right" }>) ?? [];
-    const right = (matches ?? []).filter((m) => m.direction === "right").length;
-    swipeSummary = { right, left: (matches ?? []).length - right };
-  }
-
-  return {
-    renter,
-    listings,
-    swipeSummary,
-  };
+async function loadSwipeSummary(
+  renterId: string
+): Promise<{ right: number; left: number }> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("matches")
+    .select("direction")
+    .eq("renter_id", renterId);
+  const arr =
+    (data as unknown as Array<{ direction: "left" | "right" }>) ?? [];
+  const right = arr.filter((m) => m.direction === "right").length;
+  return { right, left: arr.length - right };
 }
 
 export default async function ProfilePage() {
@@ -74,114 +91,257 @@ export default async function ProfilePage() {
     redirect("/login?redirect=/profile");
   }
 
-  const { renter, listings, swipeSummary } = await loadProfile(user.id);
+  const role = await resolveUserRole(user);
 
+  if (role === "new") {
+    return (
+      <Shell email={user.email ?? "—"}>
+        <EmptyRoleProfile intent={readIntent(user)} />
+      </Shell>
+    );
+  }
+
+  if (role === "renter") {
+    const renter = await loadRenter(user.id);
+    const swipes = renter
+      ? await loadSwipeSummary(renter.id)
+      : { right: 0, left: 0 };
+    return (
+      <Shell email={user.email ?? "—"} eyebrow="Renter">
+        <RenterProfileSections profile={renter} swipes={swipes} />
+      </Shell>
+    );
+  }
+
+  if (role === "landlord") {
+    const listings = await loadListings(user.id);
+    return (
+      <Shell email={user.email ?? "—"} eyebrow="Landlord">
+        <LandlordProfileSections listings={listings} />
+      </Shell>
+    );
+  }
+
+  // both
+  const [renter, listings] = await Promise.all([
+    loadRenter(user.id),
+    loadListings(user.id),
+  ]);
+  const swipes = renter
+    ? await loadSwipeSummary(renter.id)
+    : { right: 0, left: 0 };
+  return (
+    <Shell email={user.email ?? "—"} eyebrow="Renter & landlord">
+      <div className="flex flex-col gap-10">
+        <RenterProfileSections profile={renter} swipes={swipes} />
+        <LandlordProfileSections listings={listings} />
+      </div>
+    </Shell>
+  );
+}
+
+function Shell({
+  email,
+  eyebrow,
+  children,
+}: {
+  email: string;
+  eyebrow?: string;
+  children: React.ReactNode;
+}) {
   return (
     <>
       <Header />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-14">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-          Account
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:py-16">
+        <p
+          className="font-mono text-[11px] uppercase tracking-[0.22em]
+            text-muted-foreground"
+        >
+          {eyebrow ?? "Account"}
         </p>
-        <h1 className="mt-2 text-[34px] font-semibold tracking-tight">Profile</h1>
-        <p className="mt-3 text-[15px] text-muted">
-          Signed in as <strong>{user.email}</strong>
+        <h1
+          className="mt-3 font-display text-[40px] leading-[1.05]
+            tracking-tight sm:text-[48px]"
+          style={{ fontVariationSettings: "'opsz' 144, 'SOFT' 60" }}
+        >
+          Profile
+        </h1>
+        <p className="mt-3 text-[15px] text-muted-foreground">
+          Signed in as <strong>{email}</strong>
         </p>
-
-        <section className="mt-10 rounded-2xl border border-hairline bg-surface p-6">
-          <h2 className="text-[19px] font-semibold tracking-tight">Renter profile</h2>
-          {renter ? (
-            <div className="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-              <Item
-                label="Budget"
-                value={
-                  renter.budget_min != null && renter.budget_max != null
-                    ? `$${renter.budget_min}–$${renter.budget_max}`
-                    : "—"
-                }
-              />
-              <Item label="Move date" value={renter.move_date ?? "—"} />
-              <Item label="Roommates" value={String(renter.roommates ?? "—")} />
-              <Item label="Neighborhoods" value={(renter.neighborhoods ?? []).join(", ") || "—"} />
-              <Item label="Dealbreakers" value={(renter.dealbreakers ?? []).join(", ") || "—"} />
-              <Item label="Ideal place" value={renter.description ?? "—"} />
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-muted">
-              You have not completed renter onboarding yet.
-            </p>
-          )}
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-hairline bg-surface p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-[19px] font-semibold tracking-tight">
-              Swipe activity
-            </h2>
-            <Link
-              href="/dashboard"
-              className="text-[13px] font-medium text-accent underline-offset-4 hover:underline"
-            >
-              View full history →
-            </Link>
-          </div>
-          <div className="mt-4 flex gap-4 text-sm">
-            <Badge label="Saved" value={swipeSummary.right} />
-            <Badge label="Passed" value={swipeSummary.left} />
-          </div>
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-hairline bg-surface p-6">
-          <h2 className="text-[19px] font-semibold tracking-tight">
-            Landlord submissions ({listings.length})
-          </h2>
-          {listings.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">
-              You have not submitted any listings yet.
-            </p>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full divide-y divide-hairline text-sm">
-                <thead className="text-left text-[11px] uppercase tracking-widest text-muted">
-                  <tr>
-                    <th className="py-2 pr-4">Address</th>
-                    <th className="py-2 pr-4">Rent</th>
-                    <th className="py-2 pr-4">Layout</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {listings.map((l) => (
-                    <tr key={l.id}>
-                      <td className="py-2 pr-4">{l.address ?? "—"}</td>
-                      <td className="py-2 pr-4">
-                        {l.rent != null ? `$${l.rent}` : "—"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {l.bedrooms ?? "?"}BR · {l.bathrooms ?? "?"} bath
-                      </td>
-                      <td className="py-2 pr-4 capitalize">{l.status}</td>
-                      <td className="py-2">
-                        {new Date(l.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <div className="mt-10">{children}</div>
       </main>
       <Footer />
     </>
   );
 }
 
+function RenterProfileSections({
+  profile,
+  swipes,
+}: {
+  profile: RenterProfile | null;
+  swipes: { right: number; left: number };
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader className="border-b pb-4">
+          <CardTitle>Renter preferences</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {profile ? (
+            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+              <Item
+                label="Budget"
+                value={
+                  profile.budget_min != null && profile.budget_max != null
+                    ? `$${profile.budget_min}–$${profile.budget_max}`
+                    : "—"
+                }
+              />
+              <Item label="Move date" value={profile.move_date ?? "—"} />
+              <Item
+                label="Roommates"
+                value={String(profile.roommates ?? "—")}
+              />
+              <Item
+                label="Neighborhoods"
+                value={(profile.neighborhoods ?? []).join(", ") || "—"}
+              />
+              <Item
+                label="Dealbreakers"
+                value={(profile.dealbreakers ?? []).join(", ") || "—"}
+              />
+              <Item label="Ideal place" value={profile.description ?? "—"} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You haven&rsquo;t completed renter onboarding yet.
+            </p>
+          )}
+          <div className="mt-5">
+            <Button
+              size="sm"
+              variant="outline"
+              render={<Link href="/for-renters/onboard" />}
+              nativeButton={false}
+            >
+              {profile ? "Update preferences" : "Set preferences"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b pb-4">
+          <CardTitle>Swipe activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Badge
+              variant="outline"
+              className="bg-brand-soft text-brand-ink"
+            >
+              Saved · {swipes.right}
+            </Badge>
+            <Badge variant="outline">Passed · {swipes.left}</Badge>
+          </div>
+          <div className="mt-5 flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              render={<Link href="/dashboard" />}
+              nativeButton={false}
+            >
+              View full history
+            </Button>
+            <Button
+              size="sm"
+              render={<Link href="/listings" />}
+              nativeButton={false}
+            >
+              Browse listings
+              <ArrowRight />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function LandlordProfileSections({
+  listings,
+}: {
+  listings: ListingProfile[];
+}) {
+  return (
+    <Card className="p-0">
+      <CardHeader className="border-b px-5 pb-4 pt-4">
+        <CardTitle>Landlord submissions ({listings.length})</CardTitle>
+      </CardHeader>
+      <CardContent className="px-0">
+        {listings.length === 0 ? (
+          <p
+            className="px-5 py-8 text-center text-sm text-muted-foreground"
+          >
+            You haven&rsquo;t submitted any listings yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-5">Address</TableHead>
+                  <TableHead>Rent</TableHead>
+                  <TableHead>Layout</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="pr-5">Submitted</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {listings.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="pl-5">{l.address ?? "—"}</TableCell>
+                    <TableCell>
+                      {l.rent != null ? `$${l.rent}` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {l.bedrooms ?? "?"}BR · {l.bathrooms ?? "?"} bath
+                    </TableCell>
+                    <TableCell className="capitalize">{l.status}</TableCell>
+                    <TableCell className="pr-5">
+                      {new Date(l.created_at).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <div className="px-5 py-4">
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href="/for-landlords/onboard" />}
+            nativeButton={false}
+          >
+            Submit a listing
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function Item({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-widest text-muted">
+      <p
+        className="font-mono text-[10px] uppercase tracking-[0.22em]
+          text-muted-foreground"
+      >
         {label}
       </p>
       <p className="mt-1 text-sm text-foreground">{value}</p>
@@ -189,11 +349,75 @@ function Item({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Badge({ label, value }: { label: string; value: number }) {
+function EmptyRoleProfile({
+  intent,
+}: {
+  intent: "renter" | "landlord" | null;
+}) {
   return (
-    <div className="rounded-full border border-hairline px-3 py-1.5">
-      <span className="text-muted">{label}</span>{" "}
-      <strong className="text-foreground">{value}</strong>
-    </div>
+    <Card>
+      <CardContent className="flex flex-col items-start gap-4 py-6">
+        <span
+          className="inline-flex size-10 items-center justify-center rounded-xl
+            bg-brand-soft text-brand-ink"
+        >
+          {intent === "landlord" ? (
+            <Building2 className="size-5" strokeWidth={1.5} />
+          ) : (
+            <Compass className="size-5" strokeWidth={1.5} />
+          )}
+        </span>
+        <div>
+          <h2
+            className="font-display text-[22px] leading-tight tracking-tight"
+            style={{ fontVariationSettings: "'opsz' 144" }}
+          >
+            Finish setting up your profile
+          </h2>
+          <p className="mt-1 text-[14px] text-muted-foreground">
+            {intent === "landlord"
+              ? "Submit your first listing to populate your landlord profile."
+              : intent === "renter"
+                ? "Set your search preferences to populate your renter profile."
+                : "Pick the path that fits how you'll use Setl."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {intent === "landlord" ? (
+            <Button
+              render={<Link href="/for-landlords/onboard" />}
+              nativeButton={false}
+            >
+              List a place
+              <ArrowRight />
+            </Button>
+          ) : intent === "renter" ? (
+            <Button
+              render={<Link href="/for-renters/onboard" />}
+              nativeButton={false}
+            >
+              Renter setup
+              <ArrowRight />
+            </Button>
+          ) : (
+            <>
+              <Button
+                render={<Link href="/for-renters/onboard" />}
+                nativeButton={false}
+              >
+                Renter setup
+              </Button>
+              <Button
+                variant="outline"
+                render={<Link href="/for-landlords/onboard" />}
+                nativeButton={false}
+              >
+                List a place
+              </Button>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

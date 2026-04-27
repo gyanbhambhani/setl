@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { notifyMatchInterest } from "@/lib/matchNotify";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/supabaseServer";
 
@@ -63,16 +62,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 
-  if (direction === "right") {
-    const notify = await notifyMatchInterest({
-      renterId: renter.id,
-      renterEmail: user.email,
-      listingId: listing_id,
-    });
-    if (!notify.ok) {
-      console.error("[matches] notifyMatchInterest", notify.error);
-    }
-  }
-
+  // Notifications are batched into a once-per-day digest. The match row sits
+  // with landlord_notified_at = null until the digest cron picks it up.
   return NextResponse.json({ ok: true });
 }

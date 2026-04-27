@@ -14,7 +14,7 @@ export default async function SignupPage({
   const sp = await searchParams;
   const user = await getSession();
   if (user) {
-    redirect("/profile");
+    redirect("/dashboard");
   }
 
   const as = sp.as;

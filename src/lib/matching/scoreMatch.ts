@@ -27,8 +27,8 @@ export type ScoredListing = {
   };
 };
 
-const OVER_BUDGET_ALLOWANCE = 0.1;
-const MIN_SCORE = 20;
+const OVER_BUDGET_ALLOWANCE = 0.2;
+const MIN_SCORE = 15;
 
 const NEIGHBORHOOD_ALIASES: Record<string, string> = {
   southside: "southside",
@@ -51,26 +51,16 @@ function amenitySet(listing: Listing): Set<string> {
   return new Set((listing.amenities ?? []).map(normalizeToken));
 }
 
-function hasAnyAmenity(amenities: Set<string>, values: string[]): boolean {
-  return values.some((v) => amenities.has(normalizeToken(v)));
-}
-
 function violatesDealbreaker(
   dealbreaker: string,
   amenities: Set<string>
 ): boolean {
+  // Dealbreakers are intentionally lenient: a missing amenity (e.g. landlord
+  // forgot to tick "parking") shouldn't disqualify a listing. We only hard
+  // filter when the listing explicitly opts out of something.
   const d = normalizeToken(dealbreaker);
-  if (d === "no laundry") {
-    return !hasAnyAmenity(amenities, ["in unit laundry", "shared laundry"]);
-  }
   if (d === "no pets" || d === "no pets allowed") {
-    return !amenities.has("pets allowed");
-  }
-  if (d === "no parking") {
-    return !amenities.has("parking");
-  }
-  if (d === "no dishwasher") {
-    return !amenities.has("dishwasher");
+    return amenities.has("no pets") || amenities.has("no pets allowed");
   }
   if (d === "shared bath" || d === "shared bathroom") {
     return amenities.has("shared bathroom") || amenities.has("shared bath");
@@ -93,14 +83,14 @@ export function passesHardFilters(
 }
 
 function scoreBudget(renter: RenterProfile, listing: Listing): number {
-  if (listing.rent == null) return 15;
-  if (listing.rent < renter.budget_min) return 25;
+  if (listing.rent == null) return 20;
+  if (listing.rent < renter.budget_min) return 30;
   if (listing.rent <= renter.budget_max) return 35;
 
   const overagePct =
     (listing.rent - renter.budget_max) / Math.max(renter.budget_max, 1);
   if (overagePct > OVER_BUDGET_ALLOWANCE) return 0;
-  return Math.max(0, 35 * (1 - overagePct / OVER_BUDGET_ALLOWANCE));
+  return Math.max(5, 35 * (1 - overagePct / OVER_BUDGET_ALLOWANCE));
 }
 
 function daysBetween(a: string, b: string): number | null {
@@ -111,35 +101,34 @@ function daysBetween(a: string, b: string): number | null {
 }
 
 function scoreTiming(renter: RenterProfile, listing: Listing): number {
-  if (!renter.move_date || !listing.available_date) return 10;
+  if (!renter.move_date || !listing.available_date) return 15;
   const diff = daysBetween(renter.move_date, listing.available_date);
-  if (diff == null) return 10;
-  if (diff > 60) return 0;
-  if (diff < -60) return 0;
-  if (diff < 0) return 12;
-
+  if (diff == null) return 12;
   const abs = Math.abs(diff);
   if (abs <= 7) return 25;
-  if (abs <= 14) return 20;
-  if (abs <= 30) return 12;
-  return 5;
+  if (abs <= 14) return 22;
+  if (abs <= 30) return 18;
+  if (abs <= 60) return 12;
+  if (abs <= 120) return 6;
+  return 3;
 }
 
 function scoreNeighborhood(renter: RenterProfile, listing: Listing): number {
   const listingNeighborhood = normalizeToken(listing.neighborhood);
-  if (!listingNeighborhood) return 10;
+  if (!listingNeighborhood) return 12;
   const wanted = new Set(renter.neighborhoods.map(normalizeToken));
-  if (wanted.size === 0) return 10;
-  return wanted.has(listingNeighborhood) ? 25 : 0;
+  if (wanted.size === 0) return 18;
+  return wanted.has(listingNeighborhood) ? 25 : 10;
 }
 
 function scoreSize(renter: RenterProfile, listing: Listing): number {
-  if (listing.bedrooms == null) return 5;
+  if (listing.bedrooms == null) return 8;
   const desiredBedrooms = renter.roommates + 1;
   const delta = Math.abs(listing.bedrooms - desiredBedrooms);
   if (delta === 0) return 15;
-  if (delta === 1) return 8;
-  return 0;
+  if (delta === 1) return 11;
+  if (delta === 2) return 6;
+  return 3;
 }
 
 export function scoreMatch(
