@@ -30,6 +30,7 @@ export type LandlordMatchRow = {
   direction: "left" | "right";
   created_at: string;
   renters: {
+    user_id: string | null;
     budget_min: number | null;
     budget_max: number | null;
     move_date: string | null;
@@ -107,8 +108,8 @@ export async function loadLandlordActivity(
       "id, address, neighborhood, rent, status, bedrooms, bathrooms, " +
         "available_date, amenities, landlord_email, landlord_phone, " +
         "created_at, photo_urls, video_url, " +
-        "matches ( direction, created_at, renters ( budget_min, budget_max, " +
-        "move_date, neighborhoods ) )"
+        "matches ( direction, created_at, renters ( user_id, budget_min, " +
+        "budget_max, move_date, neighborhoods ) )"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });

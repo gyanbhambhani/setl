@@ -15,7 +15,7 @@ export default async function SignupRegisterPage({
 }) {
   const sp = await searchParams;
   const user = await getSession();
-  const redirectTo = sp.redirect ?? "/profile";
+  const redirectTo = sp.redirect ?? "/dashboard";
   const role: "renter" | "landlord" | null =
     sp.role === "renter" || sp.role === "landlord" ? sp.role : null;
   if (user) {

@@ -142,7 +142,7 @@ async function runLandlordDigests(errors: string[]): Promise<number> {
     summariesByOwner.set(L.user_id, cur);
   }
 
-  const loginUrl = `${getPublicSiteUrl()}/login?redirect=/dashboard`;
+  const loginUrl = `${getPublicSiteUrl()}/login?redirect=/messages`;
   const now = new Date().toISOString();
   let sent = 0;
 
@@ -220,7 +220,7 @@ async function runRenterDigests(errors: string[]): Promise<number> {
 
   const renters = (data as unknown as RenterDigestRow[]) ?? [];
   const cutoffMs = Date.now() - DIGEST_WINDOW_HOURS * 60 * 60 * 1000;
-  const loginUrl = `${getPublicSiteUrl()}/login?redirect=/dashboard`;
+  const loginUrl = `${getPublicSiteUrl()}/login?redirect=/messages`;
   const now = new Date().toISOString();
   let sent = 0;
 

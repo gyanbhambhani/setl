@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSession } from "@/lib/supabaseServer";
+import { ensureConversation } from "@/lib/messaging/conversations";
 
 export const runtime = "nodejs";
 
@@ -50,19 +51,38 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { error } = await supabase
+  const { data: matchRow, error } = await supabase
     .from("matches")
     .upsert(
       { renter_id: renter.id, listing_id, direction },
       { onConflict: "renter_id,listing_id" }
-    );
+    )
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !matchRow) {
     console.error("[matches] upsert failed", error);
     return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 
-  // Notifications are batched into a once-per-day digest. The match row sits
-  // with landlord_notified_at = null until the digest cron picks it up.
+  // On a right swipe, open (or refresh) the messaging thread between the
+  // renter and the landlord so they can talk in-app. The function is
+  // idempotent: a second right-swipe on the same listing returns the existing
+  // conversation. Failures are logged but don't fail the swipe — the
+  // conversation can be opened lazily later if anything goes wrong.
+  if (direction === "right") {
+    try {
+      await ensureConversation({
+        matchId: matchRow.id,
+        renterUserId: user.id,
+        listingId: listing_id,
+      });
+    } catch (err) {
+      console.error("[matches] ensureConversation failed", err);
+    }
+  }
+
+  // Daily digest still picks up landlord_notified_at = null rows for the
+  // batched email; in-app threading just runs in parallel.
   return NextResponse.json({ ok: true });
 }

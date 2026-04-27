@@ -12,6 +12,7 @@ import {
   Loader2,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   Trash2,
   X,
@@ -32,9 +33,14 @@ import type { LandlordListingActivity } from "./loadDashboard";
 
 type Props = {
   listings: LandlordListingActivity[];
+  /** `${listing_id}::${renter_user_id}` -> conversation_id */
+  conversationsByMatchKey?: Record<string, string>;
 };
 
-export function LandlordListingsClient({ listings }: Props) {
+export function LandlordListingsClient({
+  listings,
+  conversationsByMatchKey,
+}: Props) {
   if (listings.length === 0) {
     return (
       <Empty className="mt-6">
@@ -62,13 +68,23 @@ export function LandlordListingsClient({ listings }: Props) {
   return (
     <div className="mt-6 flex flex-col gap-3">
       {listings.map((L) => (
-        <ListingRow key={L.id} listing={L} />
+        <ListingRow
+          key={L.id}
+          listing={L}
+          conversationsByMatchKey={conversationsByMatchKey}
+        />
       ))}
     </div>
   );
 }
 
-function ListingRow({ listing: L }: { listing: LandlordListingActivity }) {
+function ListingRow({
+  listing: L,
+  conversationsByMatchKey,
+}: {
+  listing: LandlordListingActivity;
+  conversationsByMatchKey?: Record<string, string>;
+}) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -256,30 +272,58 @@ function ListingRow({ listing: L }: { listing: LandlordListingActivity }) {
                       <TableHead>Budget</TableHead>
                       <TableHead>Move</TableHead>
                       <TableHead>Areas</TableHead>
+                      <TableHead>Reply</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {saves.map((m, i) => (
-                      <TableRow key={`${L.id}-save-${m.created_at}-${i}`}>
-                        <TableCell
-                          className="whitespace-nowrap text-muted-foreground"
-                        >
-                          {new Date(m.created_at).toLocaleString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </TableCell>
-                        <TableCell>{formatBudget(m.renters)}</TableCell>
-                        <TableCell>
-                          {m.renters?.move_date ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {(m.renters?.neighborhoods ?? []).join(", ") || "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {saves.map((m, i) => {
+                      const renterUserId = m.renters?.user_id ?? null;
+                      const convId = renterUserId
+                        ? conversationsByMatchKey?.[
+                            `${L.id}::${renterUserId}`
+                          ]
+                        : undefined;
+                      return (
+                        <TableRow key={`${L.id}-save-${m.created_at}-${i}`}>
+                          <TableCell
+                            className="whitespace-nowrap text-muted-foreground"
+                          >
+                            {new Date(m.created_at).toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </TableCell>
+                          <TableCell>{formatBudget(m.renters)}</TableCell>
+                          <TableCell>
+                            {m.renters?.move_date ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {(m.renters?.neighborhoods ?? []).join(", ") ||
+                              "—"}
+                          </TableCell>
+                          <TableCell>
+                            {convId ? (
+                              <Link
+                                href={`/messages/${convId}`}
+                                className="inline-flex items-center gap-1
+                                  text-[12px] font-medium text-foreground
+                                  underline underline-offset-4
+                                  hover:text-brand-ink"
+                              >
+                                <MessageCircle className="size-3" />
+                                Reply
+                              </Link>
+                            ) : (
+                              <span className="text-[12px] text-muted-foreground">
+                                —
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -383,7 +427,10 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 function formatBudget(
-  renter: { budget_min: number | null; budget_max: number | null } | null
+  renter: {
+    budget_min: number | null;
+    budget_max: number | null;
+  } | null
 ): string {
   if (!renter) return "—";
   if (renter.budget_min != null && renter.budget_max != null) {

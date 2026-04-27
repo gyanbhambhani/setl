@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SetlWordmark } from "@/components/SetlLogo";
+import { getTotalUnreadForUser } from "@/lib/messaging/conversations";
 import { getSession } from "@/lib/supabaseServer";
 
 export async function Header() {
@@ -10,7 +11,15 @@ export async function Header() {
   } catch {
     user = null;
   }
-  const logoHref = user ? "/dashboard" : "/";
+  const logoHref = "/";
+  let unread = 0;
+  if (user) {
+    try {
+      unread = await getTotalUnreadForUser(user.id);
+    } catch {
+      unread = 0;
+    }
+  }
 
   return (
     <header
@@ -38,11 +47,40 @@ export async function Header() {
                 variant="ghost"
                 size="sm"
                 render={
-                  <Link href="/profile" title={user.email ?? "Signed in"} />
+                  <Link
+                    href="/messages"
+                    title={
+                      unread > 0
+                        ? `${unread} unread message${unread === 1 ? "" : "s"}`
+                        : "Messages"
+                    }
+                  />
                 }
                 nativeButton={false}
               >
-                Profile
+                <span className="relative inline-flex items-center">
+                  Messages
+                  {unread > 0 ? (
+                    <span
+                      aria-hidden
+                      className="absolute -right-2 -top-1 inline-block size-2
+                        rounded-full bg-brand"
+                    />
+                  ) : null}
+                </span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={
+                  <Link
+                    href="/dashboard"
+                    title={user.email ?? "Signed in"}
+                  />
+                }
+                nativeButton={false}
+              >
+                Dashboard
               </Button>
               <form action="/api/auth/signout" method="post">
                 <Button

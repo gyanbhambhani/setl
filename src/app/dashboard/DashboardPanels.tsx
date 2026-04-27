@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Heart, X } from "lucide-react";
+import { ArrowRight, Heart, MessageCircle, X } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ConversationListItem } from "@/lib/messaging/conversations";
 import { LandlordListingsClient } from "./LandlordListingsClient";
 import type {
   LandlordListingActivity,
@@ -25,8 +27,12 @@ import type {
 
 export function LandlordPanel({
   listings,
+  conversations = [],
+  conversationsByMatchKey,
 }: {
   listings: LandlordListingActivity[];
+  conversations?: ConversationListItem[];
+  conversationsByMatchKey?: Record<string, string>;
 }) {
   const stats = computeLandlordStats(listings);
 
@@ -36,6 +42,11 @@ export function LandlordPanel({
         eyebrow="Landlord"
         title="Your listings"
         description="Submissions and renter swipe activity on each place."
+      />
+
+      <MessagesCard
+        conversations={conversations}
+        emptyHint="No renters have saved a listing yet. When they do, a chat opens here."
       />
 
       {listings.length > 0 ? (
@@ -74,7 +85,10 @@ export function LandlordPanel({
         </Card>
       ) : null}
 
-      <LandlordListingsClient listings={listings} />
+      <LandlordListingsClient
+        listings={listings}
+        conversationsByMatchKey={conversationsByMatchKey}
+      />
 
       {listings.length > 0 ? (
         <div className="mt-6">
@@ -178,9 +192,11 @@ function StatTile({
 export function RenterPanel({
   profile,
   rows,
+  conversations = [],
 }: {
   profile: RenterProfileRow | null;
   rows: RenterSwipeRow[];
+  conversations?: ConversationListItem[];
 }) {
   const saved = rows.filter((r) => r.direction === "right").length;
   const passed = rows.filter((r) => r.direction === "left").length;
@@ -191,6 +207,11 @@ export function RenterPanel({
         eyebrow="Renter"
         title="Your search"
         description="Preferences and every swipe you've made on Browse."
+      />
+
+      <MessagesCard
+        conversations={conversations}
+        emptyHint="Save a listing on Browse to start a conversation with the landlord."
       />
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -374,6 +395,100 @@ export function RenterPanel({
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function MessagesCard({
+  conversations,
+  emptyHint,
+}: {
+  conversations: ConversationListItem[];
+  emptyHint: string;
+}) {
+  const top = conversations.slice(0, 3);
+  const totalUnread = conversations.reduce(
+    (sum, c) => sum + c.unread_count,
+    0
+  );
+  return (
+    <Card className="mt-6 p-0">
+      <CardHeader
+        className="flex flex-row items-center justify-between border-b
+          px-5 pb-4 pt-4"
+      >
+        <div className="flex items-center gap-2">
+          <CardTitle>Messages</CardTitle>
+          {totalUnread > 0 ? (
+            <Badge className="bg-brand text-brand-foreground">
+              {totalUnread} new
+            </Badge>
+          ) : null}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          render={<Link href="/messages" />}
+          nativeButton={false}
+        >
+          Open inbox
+          <ArrowRight />
+        </Button>
+      </CardHeader>
+      <CardContent className="px-0 py-0">
+        {top.length === 0 ? (
+          <p className="px-5 py-6 text-[13px] text-muted-foreground">
+            {emptyHint}
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {top.map((c) => {
+              const other =
+                c.other_email ??
+                (c.perspective === "renter" ? "Landlord" : "Renter");
+              const initial = other.trim().charAt(0).toUpperCase() || "?";
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={`/messages/${c.id}`}
+                    className="flex items-center gap-4 px-5 py-3 transition-colors
+                      hover:bg-muted/40"
+                  >
+                    <Avatar size="default">
+                      <AvatarFallback>{initial}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[14px] font-medium">
+                          {c.listing_address ?? "Listing"}
+                        </p>
+                        {c.unread_count > 0 ? (
+                          <Badge
+                            className="bg-brand text-brand-foreground"
+                            variant="default"
+                          >
+                            {c.unread_count}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p
+                        className="mt-0.5 truncate text-[12px]
+                          text-muted-foreground"
+                      >
+                        {other} · {c.preview || "Conversation started"}
+                      </p>
+                    </div>
+                    <MessageCircle
+                      className="size-4 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

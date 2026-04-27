@@ -5,6 +5,10 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  listConversationsForUser,
+  type ConversationListItem,
+} from "@/lib/messaging/conversations";
 import { getSession } from "@/lib/supabaseServer";
 import { readIntent, resolveUserRole } from "@/lib/userRole";
 import { LandlordPanel, RenterPanel } from "./DashboardPanels";
@@ -13,6 +17,16 @@ import {
   loadRenterProfile,
   loadRenterSwipes,
 } from "./loadDashboard";
+
+function buildConversationsByMatchKey(
+  conversations: ConversationListItem[]
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const c of conversations) {
+    out[`${c.listing_id}::${c.renter_user_id}`] = c.id;
+  }
+  return out;
+}
 
 export const metadata = { title: "Dashboard — Setl" };
 export const dynamic = "force-dynamic";
@@ -29,12 +43,24 @@ export default async function DashboardPage() {
     return <NewUserDashboard email={user.email ?? ""} intent={readIntent(user)} />;
   }
 
+  const conversations = await listConversationsForUser(user.id);
+  const renterConversations = conversations.filter(
+    (c) => c.perspective === "renter"
+  );
+  const landlordConversations = conversations.filter(
+    (c) => c.perspective === "landlord"
+  );
+
   if (role === "renter") {
     const profile = await loadRenterProfile(user.id);
     const swipes = profile ? await loadRenterSwipes(profile.id) : [];
     return (
       <Shell email={user.email ?? ""} subtitle="Your search and swipes.">
-        <RenterPanel profile={profile} rows={swipes} />
+        <RenterPanel
+          profile={profile}
+          rows={swipes}
+          conversations={renterConversations}
+        />
       </Shell>
     );
   }
@@ -46,7 +72,13 @@ export default async function DashboardPage() {
         email={user.email ?? ""}
         subtitle="Your submissions and renter interest."
       >
-        <LandlordPanel listings={listings} />
+        <LandlordPanel
+          listings={listings}
+          conversations={landlordConversations}
+          conversationsByMatchKey={buildConversationsByMatchKey(
+            landlordConversations
+          )}
+        />
       </Shell>
     );
   }
@@ -67,8 +99,18 @@ export default async function DashboardPage() {
       ]}
     >
       <div className="flex flex-col gap-12">
-        <RenterPanel profile={profile} rows={swipes} />
-        <LandlordPanel listings={listings} />
+        <RenterPanel
+          profile={profile}
+          rows={swipes}
+          conversations={renterConversations}
+        />
+        <LandlordPanel
+          listings={listings}
+          conversations={landlordConversations}
+          conversationsByMatchKey={buildConversationsByMatchKey(
+            landlordConversations
+          )}
+        />
       </div>
     </Shell>
   );
