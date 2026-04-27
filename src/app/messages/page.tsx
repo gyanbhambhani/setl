@@ -21,7 +21,11 @@ export default async function MessagesInboxPage() {
   return (
     <>
       <Header />
-      <InboxShell conversations={[]} active={null} />
+      <InboxShell
+        conversations={[]}
+        active={null}
+        viewerUserId={user.id}
+      />
     </>
   );
 }

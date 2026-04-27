@@ -54,6 +54,7 @@ export default async function MessageThreadPage({
       <Header />
       <InboxShell
         conversations={conversations}
+        viewerUserId={user.id}
         active={{
           id: thread.conversation.id,
           listing_address: thread.conversation.listing_address,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Lock, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 import { cn } from "@/lib/utils";
 
 export type ClientMessage = {
@@ -16,8 +17,15 @@ export type ClientMessage = {
 
 type Props = {
   conversationId: string;
+  /** Current auth user — maps Realtime rows to `from: me|them` without exposing UUIDs in the UI. */
+  viewerUserId: string;
   initialMessages: ClientMessage[];
-  pollIntervalMs?: number;
+  /**
+   * Slow safety-net `GET` while the tab is visible (missed WS events, tab
+   * sleep, etc.). Primary delivery is Supabase Realtime `INSERT` on `messages`.
+   * @default 120000
+   */
+  fallbackPollMs?: number;
   /**
    * "card" (default) is a self-contained bordered card; used on the standalone
    * thread page. "embedded" drops chrome so it can fill a parent inbox shell.
@@ -25,12 +33,45 @@ type Props = {
   variant?: "card" | "embedded";
 };
 
+/** Map a Realtime `messages` row to the slim shape the thread UI uses. */
+function realtimeRowToClientMessage(
+  raw: Record<string, unknown>,
+  viewerUserId: string,
+  expectedConversationId: string
+): ClientMessage | null {
+  if (raw.conversation_id !== expectedConversationId) return null;
+  const kind = raw.kind;
+  if (kind !== "user" && kind !== "system") return null;
+  const sender =
+    typeof raw.sender_user_id === "string" ? raw.sender_user_id : null;
+  const from: ClientMessage["from"] =
+    kind === "system"
+      ? "system"
+      : sender === viewerUserId
+        ? "me"
+        : "them";
+  const keyVersion =
+    typeof raw.key_version === "number" ? raw.key_version : 0;
+  const body =
+    keyVersion === 0
+      ? String(raw.body_plaintext ?? "")
+      : "(encrypted message — open in a supported client)";
+  return {
+    id: String(raw.id),
+    from,
+    kind: kind as ClientMessage["kind"],
+    body,
+    created_at: String(raw.created_at),
+  };
+}
+
 const TIME_SEPARATOR_MS = 30 * 60 * 1000;
 
 export function MessageThreadClient({
   conversationId,
+  viewerUserId,
   initialMessages,
-  pollIntervalMs = 4000,
+  fallbackPollMs = 120_000,
   variant = "card",
 }: Props) {
   const [messages, setMessages] = useState<ClientMessage[]>(initialMessages);
@@ -48,9 +89,76 @@ export function MessageThreadClient({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
+  /** Supabase Realtime: push new rows in this conversation (RLS-scoped). */
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    const filter = `conversation_id=eq.${conversationId}`;
+    const channel = supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const msg = realtimeRowToClientMessage(
+            row,
+            viewerUserId,
+            conversationId
+          );
+          if (!msg) return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg].sort(
+              (a, b) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime()
+            );
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [conversationId, viewerUserId]);
+
+  /**
+   * Rare GET reconciliation — catches anything the socket missed (laptop sleep,
+   * brief disconnect). Pauses when the tab is hidden.
+   */
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: number | undefined;
+
+    const clearTimer = () => {
+      if (timeoutId != undefined) {
+        window.clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+    };
+
+    const snapshotsEqual = (a: ClientMessage[], b: ClientMessage[]) => {
+      if (a.length !== b.length) return false;
+      const la = a[a.length - 1];
+      const lb = b[b.length - 1];
+      return la?.id === lb?.id;
+    };
+
+    const schedule = (ms: number) => {
+      clearTimer();
+      if (cancelled || document.visibilityState !== "visible") return;
+      timeoutId = window.setTimeout(() => void tick(), ms);
+    };
+
     const tick = async () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      clearTimer();
       try {
         const res = await fetch(`/api/messages/${conversationId}`, {
           cache: "no-store",
@@ -60,26 +168,31 @@ export function MessageThreadClient({
         if (cancelled) return;
         const incoming = data.messages ?? [];
         const prev = messagesRef.current;
-        if (incoming.length !== prev.length) {
-          setMessages(incoming);
-          return;
-        }
-        const lastA = incoming[incoming.length - 1];
-        const lastB = prev[prev.length - 1];
-        if (lastA && lastB && lastA.id !== lastB.id) {
+        if (!snapshotsEqual(incoming, prev)) {
           setMessages(incoming);
         }
       } catch {
-        // Best-effort polling; drop transient failures.
+        // ignore
       }
+      schedule(fallbackPollMs);
     };
-    const id = window.setInterval(tick, pollIntervalMs);
-    void tick();
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        clearTimer();
+        return;
+      }
+      void tick();
+    };
+
+    schedule(fallbackPollMs);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      clearTimer();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [conversationId, pollIntervalMs]);
+  }, [conversationId, fallbackPollMs]);
 
   const send = useCallback(
     async (raw: string) => {
@@ -101,7 +214,10 @@ export function MessageThreadClient({
           return;
         }
         const data = (await res.json()) as { message: ClientMessage };
-        setMessages((prev) => [...prev, data.message]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.message.id)) return prev;
+          return [...prev, data.message];
+        });
         setDraft("");
       } catch {
         setError("Network error — try again");

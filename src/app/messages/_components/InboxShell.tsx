@@ -25,9 +25,10 @@ type ActiveConversation = {
 type Props = {
   conversations: ConversationListItem[];
   active: ActiveConversation | null;
+  viewerUserId: string;
 };
 
-export function InboxShell({ conversations, active }: Props) {
+export function InboxShell({ conversations, active, viewerUserId }: Props) {
   return (
     <main
       className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-3 py-4
@@ -61,7 +62,11 @@ export function InboxShell({ conversations, active }: Props) {
           md:grid-cols-[320px_1fr]"
       >
         <ConversationsRail conversations={conversations} activeId={active?.id} />
-        <ThreadPane active={active} hasConversations={conversations.length > 0} />
+        <ThreadPane
+          active={active}
+          hasConversations={conversations.length > 0}
+          viewerUserId={viewerUserId}
+        />
       </div>
     </main>
   );
@@ -218,9 +223,11 @@ function ConversationRow({
 function ThreadPane({
   active,
   hasConversations,
+  viewerUserId,
 }: {
   active: ActiveConversation | null;
   hasConversations: boolean;
+  viewerUserId: string;
 }) {
   if (!active) {
     return (
@@ -324,6 +331,7 @@ function ThreadPane({
       <div className="min-h-0 flex-1 overflow-hidden">
         <MessageThreadClient
           conversationId={active.id}
+          viewerUserId={viewerUserId}
           initialMessages={active.initialMessages}
           variant="embedded"
         />
